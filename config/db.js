@@ -14,7 +14,8 @@ async function connectDB() {
   }
 
   try {
-    console.log(`⏳ Attempting MongoDB connection: ${uri}...`);
+    const safeUri = uri.replace(/\/\/([^:@/]+):([^@]+)@/, '//$1:****@');
+    console.log(`⏳ Attempting MongoDB connection: ${safeUri}...`);
     // Connect with a short timeout so that if local mongod is not running, it falls back instantly without hanging
     await mongoose.connect(uri, {
       serverSelectionTimeoutMS: 2500,
