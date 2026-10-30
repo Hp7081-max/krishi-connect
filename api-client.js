@@ -75,10 +75,24 @@
       return res;
     },
 
-    async login(contact, password) {
+    async sendOtp(email, purpose) {
+      return await apiFetch('/api/auth/otp/send', {
+        method: 'POST',
+        body: JSON.stringify({ email, purpose })
+      });
+    },
+
+    async resetPassword(email, otp, newPassword) {
+      return await apiFetch('/api/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ email, otp, newPassword })
+      });
+    },
+
+    async login(contact, password, otp) {
       const res = await apiFetch('/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ contact, password })
+        body: JSON.stringify({ contact, password, otp })
       });
       if (res.token) {
         token = res.token;

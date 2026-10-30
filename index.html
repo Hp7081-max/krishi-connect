@@ -597,6 +597,12 @@ td b{font-family:var(--fs-display)}
           </div>
         </div>
 
+        <div class="kc-field" id="kcLoginOtpBox" style="display:none">
+          <label>Email par aaya 6 digit OTP</label>
+          <input id="kcLoginOtp" class="kc-input" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="Enter OTP">
+          <button type="button" class="kc-link" id="kcResendLogin" style="margin-top:6px">Resend OTP</button>
+        </div>
+
         <div class="kc-row">
           <label class="kc-check"><input id="kcRemember" type="checkbox"> <span id="kcRememberText">Remember me</span></label>
           <button type="button" class="kc-link" id="kcForgot">Forgot password?</button>
@@ -619,9 +625,15 @@ td b{font-family:var(--fs-display)}
         </div>
 
         <div class="kc-field">
-          <label id="kcRegContactLabel">Mobile number or email</label>
-          <input id="kcRegContact" class="kc-input" type="text" autocomplete="username"
-                 placeholder="Enter mobile number or email">
+          <label id="kcRegContactLabel">Email (OTP yahin aayega)</label>
+          <input id="kcRegContact" class="kc-input" type="email" autocomplete="email"
+                 placeholder="Enter your email">
+        </div>
+
+        <div class="kc-field">
+          <label id="kcRegPhoneLabel">Mobile number (optional)</label>
+          <input id="kcRegPhone" class="kc-input" type="tel" autocomplete="tel"
+                 placeholder="10 digit mobile number">
         </div>
 
         <div class="kc-field">
@@ -640,12 +652,39 @@ td b{font-family:var(--fs-display)}
           </div>
         </div>
 
-        <button type="button" class="kc-login-btn" id="kcSubmitRegister">Create account</button>
+        <div class="kc-field" id="kcRegOtpBox" style="display:none">
+          <label>Email par aaya 6 digit OTP</label>
+          <input id="kcRegOtp" class="kc-input" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="Enter OTP">
+          <button type="button" class="kc-link" id="kcResendReg" style="margin-top:6px">Resend OTP</button>
+        </div>
+
+        <button type="button" class="kc-login-btn" id="kcSubmitRegister">Send OTP</button>
 
         <div class="kc-divider"><span id="kcOr2">or</span></div>
         <div class="kc-signup"><span id="kcHaveAccount">Already have an account?</span>
           <button type="button" id="kcGoToLogin">Sign in</button>
         </div>
+      </div>
+
+      <!-- Forgot Password View -->
+      <div id="kcForgotForm" style="display:none">
+        <div class="kc-field">
+          <label>Registered email</label>
+          <input id="kcFpEmail" class="kc-input" type="email" autocomplete="email" placeholder="Enter your registered email">
+        </div>
+        <div id="kcFpStep2" style="display:none">
+          <div class="kc-field">
+            <label>Email par aaya 6 digit OTP</label>
+            <input id="kcFpOtp" class="kc-input" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="Enter OTP">
+            <button type="button" class="kc-link" id="kcFpResend" style="margin-top:6px">Resend OTP</button>
+          </div>
+          <div class="kc-field">
+            <label>Naya password</label>
+            <input id="kcFpPass" class="kc-input" type="password" autocomplete="new-password" placeholder="New password (min 4 characters)">
+          </div>
+        </div>
+        <button type="button" class="kc-login-btn" id="kcFpBtn">Send OTP</button>
+        <div class="kc-signup" style="margin-top:12px"><button type="button" id="kcFpBack">Back to Sign in</button></div>
       </div>
 
       <div class="kc-note" id="kcNote">Connected to Krishi Connect MongoDB Backend</div>
@@ -4905,6 +4944,7 @@ if(window.KrishiAPI){
 
   function setMode(m){
     mode = m;
+    if($("kcForgotForm")) $("kcForgotForm").style.display = "none";
     const t = I18N[lang];
     if(mode === "signup"){
       $("kcLoginForm").style.display = "none";
@@ -4931,15 +4971,14 @@ if(window.KrishiAPI){
       kcRoleLabel:t.role,kcFarmer:t.farmer,kcBuyer:t.buyer,kcAdmin:t.admin,
       kcContactLabel:t.contact,kcPasswordLabel:t.password,
       kcRememberText:t.remember,kcForgot:t.forgot,kcLogin:t.sign,kcOr:t.or,kcNoAccount:t.no,kcSignup:t.create,
-      kcRegNameLabel:t.fullName,kcRegContactLabel:t.contact,kcRegPasswordLabel:t.newPass,kcRegPassword2Label:t.rePass,
-      kcSubmitRegister:t.create,kcOr2:t.or,kcHaveAccount:t.haveAccount,kcGoToLogin:t.goToLogin,
+      kcRegNameLabel:t.fullName,kcRegPasswordLabel:t.newPass,kcRegPassword2Label:t.rePass,
+      kcOr2:t.or,kcHaveAccount:t.haveAccount,kcGoToLogin:t.goToLogin,
       kcNote:t.note
     };
     Object.keys(map).forEach(k=>{ if($(k)) $(k).textContent=map[k]; });
     $("kcContact").placeholder=t.contactPh;
     $("kcPassword").placeholder=t.passPh;
     if($("kcRegName")) $("kcRegName").placeholder=t.fullNamePh;
-    if($("kcRegContact")) $("kcRegContact").placeholder=t.contactPh;
     if($("kcRegPassword")) $("kcRegPassword").placeholder=t.newPassPh;
     if($("kcRegPassword2")) $("kcRegPassword2").placeholder=t.rePassPh;
     $("kcLang").value=lang;
@@ -4985,7 +5024,9 @@ if(window.KrishiAPI){
       $("kcSubmitRegister").addEventListener("click", async ()=>{
         const t=I18N[lang];
         const name=$("kcRegName").value.trim();
-        const contact=$("kcRegContact").value.trim();
+        const contact=$("kcRegContact").value.trim().toLowerCase();
+        const phone=$("kcRegPhone").value.trim();
+        const otp=$("kcRegOtp").value.trim();
         const p1=$("kcRegPassword").value.trim();
         const p2=$("kcRegPassword2").value.trim();
 
@@ -5004,11 +5045,29 @@ if(window.KrishiAPI){
           return;
         }
 
+        if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)){
+          toast(lang==="hi" ? "सही ईमेल दर्ज करें।" : "Please enter a valid email address.");
+          return;
+        }
+
         if(window.KrishiAPI && window.KrishiAPI.isOnline){
           try{
-            toast(lang==="hi" ? "⏳ मोंगो-डीबी में अकाउंट बनाया जा रहा है..." : "⏳ Creating account in MongoDB...");
+            // Step 1: send OTP to email
+            if($("kcRegOtpBox").style.display === "none"){
+              toast("⏳ OTP bheja ja raha hai...");
+              await window.KrishiAPI.sendOtp(contact, "register");
+              $("kcRegOtpBox").style.display = "block";
+              $("kcSubmitRegister").textContent = "Verify OTP & Create account";
+              toast("📧 OTP aapke email par bhej diya gaya hai (Spam bhi dekhein).");
+              return;
+            }
+            if(!/^\d{6}$/.test(otp)){ toast("6 digit OTP daalein."); return; }
+            // Step 2: verify OTP + create account
+            toast(lang==="hi" ? "⏳ अकाउंट बनाया जा रहा है..." : "⏳ Creating account...");
             const res = await window.KrishiAPI.register({
               contact: contact,
+              phone: phone,
+              otp: otp,
               password: p1,
               role: role,
               name: name,
@@ -5074,10 +5133,19 @@ if(window.KrishiAPI){
     $("kcLogin").addEventListener("click", async ()=>{
       const t=I18N[lang],c=$("kcContact").value.trim(),p=$("kcPassword").value.trim();
       if(!c||!p){toast(t.fill);return}
+      const loginOtp = $("kcLoginOtp").value.trim();
+      const otpPending = $("kcLoginOtpBox").style.display !== "none";
+      if(otpPending && !/^\d{6}$/.test(loginOtp)){ toast("6 digit OTP daalein."); return; }
       if(window.KrishiAPI && window.KrishiAPI.isOnline){
         try{
           toast(lang==="hi" ? "⏳ मोंगो-डीबी से कनेक्ट किया जा रहा है..." : "⏳ Connecting to MongoDB...");
-          const res = await window.KrishiAPI.login(c, p);
+          const res = await window.KrishiAPI.login(c, p, otpPending ? loginOtp : undefined);
+          if(res && res.success && res.otpRequired){
+            $("kcLoginOtpBox").style.display = "block";
+            $("kcLogin").textContent = "Verify OTP & Sign in";
+            toast("📧 OTP aapke email par bhej diya gaya hai (Spam bhi dekhein).");
+            return;
+          }
           if(res && res.success){
             const user = res.user;
             const actualRole = user.role || role;
@@ -5139,7 +5207,56 @@ if(window.KrishiAPI){
       });
     }
 
-    $("kcForgot").addEventListener("click",()=>toast(I18N[lang].forgotMsg));
+    // Resend OTP (register)
+    $("kcResendReg").addEventListener("click", async ()=>{
+      try{
+        await window.KrishiAPI.sendOtp($("kcRegContact").value.trim().toLowerCase(), "register");
+        toast("📧 Naya OTP bhej diya gaya.");
+      }catch(err){ toast("⚠️ " + err.message); }
+    });
+    // Resend OTP (login) - password is re-checked by the server
+    $("kcResendLogin").addEventListener("click", async ()=>{
+      try{
+        const r = await window.KrishiAPI.login($("kcContact").value.trim(), $("kcPassword").value.trim());
+        toast(r && r.otpRequired ? "📧 Naya OTP bhej diya gaya." : "Dobara sign in dabayein.");
+      }catch(err){ toast("⚠️ " + err.message); }
+    });
+
+    // Forgot password flow
+    function showForgot(show){
+      $("kcFpStep2").style.display = "none";
+      $("kcFpBtn").textContent = "Send OTP";
+      $("kcFpOtp").value = ""; $("kcFpPass").value = "";
+      $("kcLoginForm").style.display = show ? "none" : "block";
+      $("kcForgotForm").style.display = show ? "block" : "none";
+      if(show && $("kcContact").value.includes("@") && !$("kcFpEmail").value) $("kcFpEmail").value = $("kcContact").value.trim();
+    }
+    $("kcForgot").addEventListener("click",()=>showForgot(true));
+    $("kcFpBack").addEventListener("click",()=>showForgot(false));
+    $("kcFpResend").addEventListener("click", async ()=>{
+      try{
+        await window.KrishiAPI.sendOtp($("kcFpEmail").value.trim().toLowerCase(), "reset");
+        toast("📧 Naya OTP bhej diya gaya.");
+      }catch(err){ toast("⚠️ " + err.message); }
+    });
+    $("kcFpBtn").addEventListener("click", async ()=>{
+      const email = $("kcFpEmail").value.trim().toLowerCase();
+      try{
+        if($("kcFpStep2").style.display === "none"){
+          await window.KrishiAPI.sendOtp(email, "reset");
+          $("kcFpStep2").style.display = "block";
+          $("kcFpBtn").textContent = "Reset password";
+          toast("📧 OTP aapke email par bhej diya gaya hai (Spam bhi dekhein).");
+          return;
+        }
+        const otp = $("kcFpOtp").value.trim(), np = $("kcFpPass").value.trim();
+        if(!/^\d{6}$/.test(otp) || np.length < 4){ toast("6 digit OTP aur naya password (min 4 akshar) daalein."); return; }
+        const r = await window.KrishiAPI.resetPassword(email, otp, np);
+        toast("✅ " + r.message);
+        $("kcContact").value = email; $("kcPassword").value = "";
+        showForgot(false);
+      }catch(err){ toast("⚠️ " + err.message); }
+    });
 
     apply();
   });
