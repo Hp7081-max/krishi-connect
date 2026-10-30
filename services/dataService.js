@@ -151,14 +151,14 @@ async function seedMongoDBIfNeeded() {
 }
 
 // ======================== AUTH ========================
-async function registerUser({ contact, password, role = 'farmer', name, village = 'Barabanki, Uttar Pradesh' }) {
+async function registerUser({ contact, password, role = 'farmer', name, village = 'Barabanki, Uttar Pradesh', phone: givenPhone }) {
   ensureDataFile();
   const status = getDBStatus();
   const cleanContact = String(contact).trim();
   const salt = await bcrypt.genSalt(10);
   const passwordHash = await bcrypt.hash(password, salt);
 
-  const phone = cleanContact.includes('@') ? '98765 43210' : cleanContact;
+  const phone = (givenPhone && String(givenPhone).trim()) || (cleanContact.includes('@') ? '98765 43210' : cleanContact);
   const bank = role === 'buyer' ? 'HDFC ••••8819' : 'PNB ••••4471';
 
   if (status.isConnected) {
@@ -255,6 +255,36 @@ async function loginUser(contact, password) {
     phone: user.phone || cleanContact,
     bank: user.bank || 'PNB ••••4471'
   };
+}
+
+async function userExists(contact) {
+  ensureDataFile();
+  const cleanContact = String(contact).trim();
+  if (getDBStatus().isConnected) {
+    return Boolean(await User.findOne({ contact: cleanContact }));
+  }
+  return inMemoryStore.users.some(u => u.contact === cleanContact);
+}
+
+async function resetPassword(contact, newPassword) {
+  ensureDataFile();
+  const cleanContact = String(contact).trim();
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(newPassword, salt);
+
+  if (getDBStatus().isConnected) {
+    const user = await User.findOne({ contact: cleanContact });
+    if (!user) throw new Error('User not found');
+    user.password = passwordHash;
+    await user.save();
+    return true;
+  }
+  const user = inMemoryStore.users.find(u => u.contact === cleanContact);
+  if (!user) throw new Error('User not found');
+  user.passwordHash = passwordHash;
+  delete user.password;
+  saveStore();
+  return true;
 }
 
 async function updateUserProfile(contact, updates = {}) {
@@ -1423,6 +1453,8 @@ module.exports = {
   registerUser,
   loginUser,
   updateUserProfile,
+  userExists,
+  resetPassword,
   getListings,
   createListing,
   getBids,
