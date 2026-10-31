@@ -17,6 +17,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
+const jwt = require('jsonwebtoken');
 const svc = require('../services/richChatService');
 
 const router = express.Router();
@@ -24,11 +25,33 @@ const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 /* ---------- login wala user ---------- */
+// Login token (JWT) yahin verify hota hai — bilkul chat ki tarah, auth guard ON/OFF se fark nahi padta.
+// Secret ka naam .env / hosting me JWT_SECRET hona chahiye (aapke login wala hi).
+function idFromToken(req) {
+  const h = req.get('authorization') || '';
+  const token = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
+  const secret = process.env.JWT_SECRET;
+  if (!token) return null;
+  if (!secret) {
+    console.warn('[chat-extras] JWT_SECRET set nahi hai, token verify nahi ho sakta');
+    return null;
+  }
+  try {
+    const p = jwt.verify(token, secret);
+    const id = p.id || p._id || p.userId || p.uid || p.sub;
+    return id ? String(id).slice(0, 64) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 function getUserId(req) {
   const fromAuth = req.user && (req.user._id || req.user.id);
   if (fromAuth) return String(fromAuth).slice(0, 64);
-  // Jab tak auth guard OFF hai: .env me CHAT_EXTRAS_TRUST_HEADER=true rakho.
-  // Auth guard ON hote hi ye line hata do / flag false kar do — warna koi bhi kisi ka naam laga sakta hai.
+  const fromToken = idFromToken(req);
+  if (fromToken) return fromToken;
+  // Sirf testing ke liye (default band): CHAT_EXTRAS_TRUST_HEADER=true par header ka naam maan liya jata hai.
+  // Live site par ise kabhi ON mat rakhna — koi bhi kisi ka naam laga sakta hai.
   if (process.env.CHAT_EXTRAS_TRUST_HEADER === 'true') {
     const h = req.get('x-user-id');
     if (h) return String(h).slice(0, 64);
