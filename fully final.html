@@ -1018,18 +1018,34 @@ const TRANSPORTERS = [
   {id:"T5", name:"Mahesh Gowda", veh:"KA 25 B 9043", type:"Truck 9T", base:"Hubli", rate:36}
 ];
 
-/* demo phone numbers (replace with real data from your backend) */
-const FARMER_PHONES = {"रामकिशन यादव":"98765 43221","संतोष पाटील":"98220 11874","जसविंदर सिंह":"98142 60935","कमलेश वर्मा":"94250 38817","मुन्ना लाल":"96283 70452","भँवर लाल जाट":"94141 52096","हरप्रीत कौर":"98159 24470","बसवराज हिरेमठ":"98450 67123"};
-const BUYER_PHONES  = {"Shri Balaji Traders":"99101 20345","Agro Fresh Retail Pvt Ltd":"98110 77652","Ganga Agro Foods":"98390 41258","BigBasket Sourcing":"80456 12390","ITC Agri Business":"80234 99871","Reliance Fresh — North":"99530 18246","Maa Annapurna Wholesale":"97210 63584","Kisan Bhandar Exports":"98730 52917"};
-const BUYER_ME_PHONE = "98100 00123";
-function fakePhone(name){ let h=7; for(const ch of String(name)) h=(h*31+ch.charCodeAt(0))%100000000; const n=String(h).padStart(8,"0"); return "9"+n.slice(0,4)+" "+n.slice(4)+"0"; }
-function farmerPhone(name){ return FARMER_PHONES[name] || fakePhone(name); }
-function buyerPhone(name){ if(name===STR.en.buyer_you||name===STR.hi.buyer_you) return BUYER_ME_PHONE; return BUYER_PHONES[name] || fakePhone(name); }
+/* Phone numbers: ONLY real numbers are ever shown. Nothing is invented from a name.
+   Old made-up demo numbers count as "no number". The other party's number is NOT put in deals/contracts yet:
+   the server sends every deal to every user, so a real number there would be readable by anyone. */
+const PLACEHOLDER_PHONES = ["9876543210","9876543221","9810000123"];
+function cleanPhone(p){
+  const s=String(p==null?"":p);
+  if(s.indexOf("@")>=0) return "";
+  const d=s.replace(/\D/g,"");
+  if(d.length<10) return "";
+  const x=d.slice(-10);
+  if(!/^[6-9]/.test(x) || PLACEHOLDER_PHONES.indexOf(x)>=0) return "";
+  return x.slice(0,5)+" "+x.slice(5);
+}
+function myPhone(){ return cleanPhone(S && S.me && S.me.phone); }
+function partyPhone(name){
+  const me=String((S&&S.me&&S.me.name)||"").trim().toLowerCase(), n=String(name||"").trim().toLowerCase();
+  return (me && n && me===n) ? myPhone() : "";
+}
+function farmerPhone(name){ return partyPhone(name); }
+function buyerPhone(name){ if(name===STR.en.buyer_you||name===STR.hi.buyer_you) return myPhone(); return partyPhone(name); }
+function phoneHTML(p){
+  return p ? `<a class="ph" href="tel:${esc(String(p).replace(/\s/g,""))}">📞 ${esc(p)}</a>` : `<span class="ph muted">📞 —</span>`;
+}
 function makeContract(d){
   const l=S.listings.find(x=>x.id===d.listingId)||{};
   return { id:"C-"+d.id, dealId:d.id, created:d.created,
-    seller:{name:d.farmer, phone:d.sellerPhone||farmerPhone(d.farmer), place:(l.district||"")+", "+(l.state||"")},
-    buyer:{name:d.buyer, phone:d.buyerPhone||buyerPhone(d.buyer)},
+    seller:{name:d.farmer, phone:cleanPhone(d.sellerPhone)||farmerPhone(d.farmer), place:(l.district||"")+", "+(l.state||"")},
+    buyer:{name:d.buyer, phone:cleanPhone(d.buyerPhone)||buyerPhone(d.buyer)},
     cropKey:l.cropKey, grade:l.grade||"B", qty:d.qty, rate:d.rate, amount:d.amount, commission:d.commission };
 }
 
@@ -1062,7 +1078,7 @@ function seed(){
   return {
     lang:"hi", theme:"auto", role:"farmer",
     tab:{farmer:"home", buyer:"market", admin:"ops", transport:"map"},
-    me:{name:"किसान साथी", village:"Barabanki, Uttar Pradesh", phone:"98••••••21", bank:"PNB ••••4471"},
+    me:{name:"किसान साथी", village:"Barabanki, Uttar Pradesh", phone:"", bank:"PNB ••••4471"},
     listings, bids, deals:[], contracts:[], returns:[],
     wallet:{balance:128400, txns:[
       {id:"W1", kind:"in", label:"आलू — 120 क्विंटल", amt:148800, when:now-864e5*6},
@@ -1116,7 +1132,7 @@ function checkAuthUser(){
           S.me = {
             name: u.name,
             village: u.village || (u.role === 'admin' ? 'Central Mandi HQ' : (u.role === 'buyer' ? 'Delhi NCR' : 'Barabanki, Uttar Pradesh')),
-            phone: u.phone || u.contact || "98765 43221",
+            phone: cleanPhone(u.phone) || cleanPhone(u.contact),
             bank: u.bank || (u.role === 'admin' ? 'SBI ••••0001' : (u.role === 'buyer' ? 'HDFC ••••8819' : 'PNB ••••4471'))
           };
           if(u.role){
@@ -1419,6 +1435,13 @@ function priceRowsHTML(limit){
     </div>`;
   }).join("");
 }
+/* The forecast numbers are random (Math.random), so they are HIDDEN. Set true only after a real forecast exists. */
+const SHOW_FORECAST = false;
+function forecastBlock(){
+  return SHOW_FORECAST
+    ? `<div class="sec-head"><h2>${esc(t("ai_head"))}</h2></div>${demoNote("forecast")}<div class="stack">${forecastAlerts()}</div>`
+    : "";
+}
 function forecastAlerts(){
   return CROPS.map(c=>({c, f:S.prices[c.key].forecast}))
     .sort((a,b)=>Math.abs(b.f)-Math.abs(a.f)).slice(0,2)
@@ -1507,8 +1530,7 @@ function renderFarmer(){
         <button class="big-action" data-act="tab" data-v="tools"><span class="ic">🛠️</span><b>${esc(t("a_tools"))}</b><span>${esc(t("a_tools_s"))}</span></button>
       </div>
 
-      <div class="sec-head"><h2>${esc(t("ai_head"))}</h2></div>
-      ${demoNote("forecast")}<div class="stack">${forecastAlerts()}</div>
+      ${forecastBlock()}
 
       <div class="sec-head"><h2>${esc(t("sec_prices"))}</h2><button class="link" data-act="tab" data-v="mandi">${esc(t("all"))}</button></div>
       ${demoNote()}<div class="card">${priceRowsHTML(4)}</div>
@@ -1575,10 +1597,9 @@ function renderFarmer(){
   }
   else if(tab==="mandi"){
     v.innerHTML = `
-      <div class="sec-head"><h2>${esc(t("sec_prices"))}</h2><span class="tag gold">● demo</span></div>
+      <div class="sec-head"><h2>${esc(t("sec_prices"))}</h2>${(S.prices.tomato&&S.prices.tomato.real)?'<span class="tag green">● live</span>':'<span class="tag gold">● demo</span>'}</div>
       ${demoNote()}<div class="card">${priceRowsHTML()}</div>
-      <div class="sec-head"><h2>${esc(t("ai_head"))}</h2></div>
-      ${demoNote("forecast")}<div class="stack">${forecastAlerts()}</div>`;
+      ${forecastBlock()}`;
   }
   else if(tab==="bids"){
     const myLotsWithBids = myListings().filter(l=>bidsFor(l.id).length);
@@ -2322,9 +2343,9 @@ function renderBuyerTransport(v){
           <div class="cstat" style="margin-top:10px">
             <div class="party"><span class="role-l">🧑‍🌾 ${esc(t("ct_seller"))}</span><b>${esc(c.seller.name)}</b>
               <span class="tiny muted">📍 ${esc(c.seller.place)}</span><br>
-              <a class="ph" href="tel:${esc(tel(c.seller.phone))}">📞 ${esc(c.seller.phone)}</a></div>
+              ${phoneHTML(cleanPhone(c.seller.phone))}</div>
             <div class="party"><span class="role-l">🏬 ${esc(t("ct_buyer"))}</span><b>${esc(c.buyer.name)}</b><br>
-              <a class="ph" href="tel:${esc(tel(c.buyer.phone))}">📞 ${esc(c.buyer.phone)}</a></div>
+              ${phoneHTML(cleanPhone(c.buyer.phone))}</div>
           </div>
           <div class="agree" style="margin-top:10px"><b>${esc(t("ct_goods"))}</b><br>
             ${cropEm(c.cropKey)} ${esc(cropName(c.cropKey))} · ${en?"Grade":"ग्रेड"} ${esc(c.grade)} · ${c.qty} ${esc(t("qtl"))}<br>
@@ -2481,9 +2502,9 @@ function renderAdmin(){
           <div class="cstat" style="margin-top:10px">
             <div class="party"><span class="role-l">🧑‍🌾 ${esc(t("ct_seller"))}</span><b>${esc(c.seller.name)}</b>
               <span class="tiny muted">📍 ${esc(c.seller.place)}</span><br>
-              <a class="ph" href="tel:${esc(tel(c.seller.phone))}">📞 ${esc(c.seller.phone)}</a></div>
+              ${phoneHTML(cleanPhone(c.seller.phone))}</div>
             <div class="party"><span class="role-l">🏬 ${esc(t("ct_buyer"))}</span><b>${esc(c.buyer.name)}</b><br>
-              <a class="ph" href="tel:${esc(tel(c.buyer.phone))}">📞 ${esc(c.buyer.phone)}</a></div>
+              ${phoneHTML(cleanPhone(c.buyer.phone))}</div>
           </div>
           <div class="agree"><b>${esc(t("ct_goods"))}</b><br>
             ${cropEm(c.cropKey)} ${esc(cropName(c.cropKey))} · ${en?"Grade":"ग्रेड"} ${esc(c.grade)} · ${c.qty} ${esc(t("qtl"))}<br>
@@ -2569,8 +2590,7 @@ function renderAdmin(){
           <div style="height:9px;border-radius:5px;background:var(--line-soft);margin-top:4px;overflow:hidden">
             <div style="width:${(q/cmax*100).toFixed(1)}%;height:100%;background:var(--leaf)"></div></div>
         </div>`).join("")}</div>
-      <div class="sec-head"><h2>${esc(t("ai_head"))}</h2></div>
-      ${demoNote("forecast")}<div class="stack">${forecastAlerts()}</div>`;
+      ${forecastBlock()}`;
   }
   else if(tab==="returns"){
     renderAdminReturns(v);
@@ -4169,8 +4189,8 @@ function openContract(dealId){
       <h4>KISAAN SETU — ${en?"Digital sale agreement":"डिजिटल बिक्री अनुबंध"}</h4>
       <div class="tiny muted">${en?"Contract":"अनुबंध"} #${d.id} · ${new Date(d.created).toLocaleString("en-IN")}</div>
       <p style="margin:12px 0 0">
-        <b>${en?"Seller":"विक्रेता"}:</b> ${esc(d.farmer)}, ${esc(l.district||"")}, ${esc(l.state||"")} · 📞 ${esc(d.sellerPhone||farmerPhone(d.farmer))}<br>
-        <b>${en?"Buyer":"क्रेता"}:</b> ${esc(d.buyer)} · 📞 ${esc(d.buyerPhone||buyerPhone(d.buyer))}<br>
+        <b>${en?"Seller":"विक्रेता"}:</b> ${esc(d.farmer)}, ${esc(l.district||"")}, ${esc(l.state||"")} · 📞 ${esc(cleanPhone(d.sellerPhone)||farmerPhone(d.farmer)||"—")}<br>
+        <b>${en?"Buyer":"क्रेता"}:</b> ${esc(d.buyer)} · 📞 ${esc(cleanPhone(d.buyerPhone)||buyerPhone(d.buyer)||"—")}<br>
         <b>${en?"Commodity":"वस्तु"}:</b> ${esc(cropName(l.cropKey))} · ${en?"Grade":"ग्रेड"} ${esc(l.grade||"B")}<br>
         <b>${en?"Quantity":"मात्रा"}:</b> ${d.qty} ${t("qtl")}<br>
         <b>${en?"Rate":"दर"}:</b> ${inr(d.rate)}${t("per_qtl")}<br>
@@ -4546,7 +4566,7 @@ function acceptBid(bidId){
   const d={ id:uid("D"), listingId:l.id, farmer:l.farmer, buyer:b.buyer, rate:b.rate, qty:b.qty,
     amount, commission, escrow:"held", stage:"confirmed", transporter:null, quality:null,
     buyerCity:"Delhi NCR", created:Date.now(),
-    sellerPhone:farmerPhone(l.farmer), buyerPhone:b.mine?BUYER_ME_PHONE:buyerPhone(b.buyer) };
+    sellerPhone:farmerPhone(l.farmer), buyerPhone:b.mine?myPhone():buyerPhone(b.buyer) };
   S.deals.unshift(d);
   if(!S.contracts) S.contracts=[];
   S.contracts.unshift(makeContract(d));
@@ -4925,6 +4945,7 @@ setInterval(()=>{ try{ syncFrom(localStorage.getItem(KEY)); }catch(e){}
 setInterval(()=>{
   CROPS.forEach(c=>{
     const p=S.prices[c.key];
+    if(p.real) return;
     p.now = Math.round(p.now * (1 + (Math.random()-.5)*c.vol*.10));
     p.hist.push(p.now); if(p.hist.length>14) p.hist.shift();
   });
@@ -5475,7 +5496,7 @@ if(window.KrishiAPI){
                 window.S.me = {
                   name: user.name || name,
                   village: user.village || (actualRole === 'admin' ? 'Central Mandi HQ' : (actualRole === 'buyer' ? 'Delhi NCR' : 'Barabanki, Uttar Pradesh')),
-                  phone: user.phone || contact,
+                  phone: cleanPhone(user.phone) || cleanPhone(contact),
                   bank: user.bank || (actualRole === 'admin' ? 'SBI ••••0001' : (actualRole === 'buyer' ? 'HDFC ••••8819' : 'PNB ••••4471'))
                 };
                 save();
@@ -5497,7 +5518,7 @@ if(window.KrishiAPI){
           name: name,
           contact: contact,
           village: role === 'admin' ? 'Central Mandi HQ' : (role === 'buyer' ? 'Delhi NCR' : 'Barabanki, Uttar Pradesh'),
-          phone: contact,
+          phone: cleanPhone(contact),
           bank: role === 'admin' ? 'SBI ••••0001' : (role === 'buyer' ? 'HDFC ••••8819' : 'PNB ••••4471'),
           role: role
         };
@@ -5547,7 +5568,7 @@ if(window.KrishiAPI){
               window.S.me = {
                 name: user.name,
                 village: user.village || (actualRole === 'admin' ? 'Central Mandi HQ' : (actualRole === 'buyer' ? 'Delhi NCR' : 'Barabanki, Uttar Pradesh')),
-                phone: user.phone || c,
+                phone: cleanPhone(user.phone) || cleanPhone(c),
                 bank: user.bank || (actualRole === 'admin' ? 'SBI ••••0001' : (actualRole === 'buyer' ? 'HDFC ••••8819' : 'PNB ••••4471'))
               };
               save();
@@ -5568,7 +5589,7 @@ if(window.KrishiAPI){
       const offlineUser = {
         name: c.includes('@') ? c.split('@')[0] : defaultName,
         village: actualRole === 'admin' ? 'Central Mandi HQ' : (actualRole === 'buyer' ? 'Delhi NCR' : 'Barabanki, Uttar Pradesh'),
-        phone: c,
+        phone: cleanPhone(c),
         bank: actualRole === 'admin' ? 'SBI ••••0001' : (actualRole === 'buyer' ? 'HDFC ••••8819' : 'PNB ••••4471'),
         role: actualRole
       };
@@ -5652,5 +5673,6 @@ if(window.KrishiAPI){
 </script>
 <script src="voice.js"></script>
 <script src="disease-ai.js"></script>
+<script src="mandi-live.js"></script>
 </body>
 </html>

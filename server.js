@@ -21,6 +21,7 @@ const syncRoutes = require('./routes/sync');
 const returnRoutes = require('./routes/returns');
 const diseaseAIRoutes = require('./routes/diseaseAI');
 const gradeAIRoutes = require('./routes/gradeAI');
+const mandiRoutes = require('./routes/mandi');
 
 const app = express();
 const server = http.createServer(app);
@@ -45,6 +46,7 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.get('/api-client.js', (req, res) => res.sendFile(path.join(__dirname, 'api-client.js')));
 
 app.get('/voice.js', (req, res) => res.sendFile(path.join(__dirname, 'voice.js')));
+app.get('/mandi-live.js', (req, res) => res.sendFile(path.join(__dirname, 'mandi-live.js')));
 app.get('/disease-ai.js', (req, res) => res.sendFile(path.join(__dirname, 'disease-ai.js')));
 
 // Serve fully final.html at root route
@@ -63,6 +65,7 @@ app.use('/api/wallet', requireAuth, walletRoutes);
 app.use('/api/tools', requireAuth, toolRoutes);
 app.use('/api/disease-ai', requireAuth, diseaseAIRoutes);
 app.use('/api/grade-ai', requireAuth, gradeAIRoutes);
+app.use('/api/mandi', requireAuth, mandiRoutes);
 app.use('/api/state', requireAuth, syncRoutes);
 
 // General health check
