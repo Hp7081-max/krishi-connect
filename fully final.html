@@ -3962,21 +3962,70 @@ function openEquipModal(){
     </div>
     <button class="btn block" data-act="listequip">➕ ${esc(t("eq_add"))}</button>`);
 }
-function openWeatherModal(){
+/* ---------- Real weather (Open-Meteo: free, no API key) ---------- */
+const WX_CACHE = { key:"", at:0, data:null };
+function wxIcon(code){
+  if(code===0) return "☀️";
+  if(code===1||code===2) return "🌤️";
+  if(code===3) return "☁️";
+  if(code===45||code===48) return "🌫️";
+  if(code>=51&&code<=57) return "🌦️";
+  if(code>=61&&code<=67) return "🌧️";
+  if(code>=71&&code<=77) return "❄️";
+  if(code>=80&&code<=82) return "🌧️";
+  if(code>=95) return "⛈️";
+  return "⛅";
+}
+async function getRealWeather(){
+  const parts = String((S.me && S.me.village) || "Barabanki, Uttar Pradesh").split(",").map(x=>x.trim());
+  const district = parts[0] || "Barabanki";
+  const state = parts[1] || "Uttar Pradesh";
+  const key = district+"|"+state;
+  if(WX_CACHE.data && WX_CACHE.key===key && Date.now()-WX_CACHE.at < 30*60*1000) return WX_CACHE.data;
+
+  const g = await fetch("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(district)+"&count=10&language=en&format=json");
+  if(!g.ok) throw new Error("geocoding failed");
+  const gj = await g.json();
+  const list = (gj.results||[]).filter(r=>r.country_code==="IN");
+  const hit = list.find(r=>(r.admin1||"").toLowerCase()===state.toLowerCase()) || list[0];
+  if(!hit) throw new Error("location not found");
+
+  const url = "https://api.open-meteo.com/v1/forecast?latitude="+hit.latitude+"&longitude="+hit.longitude
+    +"&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=5";
+  const f = await fetch(url);
+  if(!f.ok) throw new Error("forecast failed");
+  const fj = await f.json();
+  const d = fj.daily;
+  if(!d || !d.time) throw new Error("bad forecast data");
+  const rows = d.time.map((day,i)=>({
+    date: day,
+    icon: wxIcon(d.weather_code[i]),
+    rain: Math.round(d.precipitation_probability_max[i] ?? 0),
+    tmax: Math.round(d.temperature_2m_max[i]),
+    tmin: Math.round(d.temperature_2m_min[i])
+  }));
+  const data = { place: (hit.name+(hit.admin1?", "+hit.admin1:"")), rows };
+  WX_CACHE.key=key; WX_CACHE.at=Date.now(); WX_CACHE.data=data;
+  return data;
+}
+function wxDayLabel(dateStr, i, en){
+  if(i===0) return en?"Today":"आज";
+  if(i===1) return en?"Tomorrow":"कल";
+  const dt = new Date(dateStr+"T12:00:00");
+  return dt.toLocaleDateString(en?"en-IN":"hi-IN",{weekday:"long", day:"numeric", month:"short"});
+}
+async function openWeatherModal(){
   const en = S.lang==="en";
-  const st = S.me.village.split(", ")[1] || "Uttar Pradesh";
-  const seed = st.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
-  const daysHi=["आज","कल","परसों","गुरुवार","शुक्रवार"], daysEn=["Today","Tomorrow","Day 3","Day 4","Day 5"];
-  const icons=["☀️","⛅","🌧️","⛈️","🌤️"];
-  const rows = [0,1,2,3,4].map(i=>{
-    const r = Math.abs(Math.sin(seed+i*1.7));
-    const rain = Math.round(r*100)%100;
-    const icon = icons[Math.floor(r*5)%5];
-    const tmax = 28 + Math.round((Math.cos(seed+i)*6));
-    const tmin = tmax-8;
-    return {label: en?daysEn[i]:daysHi[i], icon, rain, tmax, tmin};
-  });
-  const willRain = rows[0].rain>50 || rows[1].rain>60;
+  openModal(esc(t("wt_title")), `<div class="small muted" style="padding:18px 0">⏳ ${en?"Loading live weather...":"लाइव मौसम लोड हो रहा है..."}</div>`);
+  let w;
+  try{
+    w = await getRealWeather();
+  }catch(err){
+    openModal(esc(t("wt_title")), `<div class="alert" style="margin-top:10px"><span class="ic">⚠️</span><span><b>${en?"Weather could not be loaded":"मौसम लोड नहीं हो पाया"}</b><p>${en?"Check your internet and try again.":"इंटरनेट जाँचकर दोबारा कोशिश करें।"}</p></span></div>`);
+    return;
+  }
+  const rows = w.rows.map((r,i)=>({...r, label: wxDayLabel(r.date,i,en)}));
+  const willRain = rows[0].rain>50 || (rows[1] && rows[1].rain>60);
   const advice = willRain ? t("wt_hold") : (rows[0].rain<20 ? t("wt_dry") : t("wt_water"));
   const rowsHTML = rows.map(r=>`
     <div class="price-row">
@@ -3985,7 +4034,7 @@ function openWeatherModal(){
       <span class="pr"><b>${r.tmax}°</b><span class="tiny muted">${r.tmin}°</span></span>
     </div>`).join("");
   openModal(esc(t("wt_title")), `
-    <div class="tiny muted" style="margin-bottom:8px">📍 ${esc(st)}</div>
+    <div class="tiny muted" style="margin-bottom:8px">📍 ${esc(w.place)} · ${en?"Live data: Open-Meteo":"लाइव डेटा: Open-Meteo"}</div>
     <div class="sec-head" style="margin-top:0"><h2 style="font-size:16px">${esc(t("wt_5day"))}</h2></div>
     <div class="card">${rowsHTML}</div>
     <div class="alert ${willRain?"":"down"}" style="margin-top:14px">
@@ -4562,15 +4611,19 @@ setInterval(()=>{
   if(!uiBusy()) render(); else save();
 }, 17000);
 
-setInterval(()=>{
+setInterval(async ()=>{
   if(!S.tools || !S.tools.weatherAlerts || S.role!=="farmer") return;
-  const en = S.lang==="en";
-  const rainy = Math.random()>0.55;
-  const msg = rainy
-    ? (en?"🌧️ Weather alert: rain expected tomorrow — hold irrigation.":"🌧️ मौसम अलर्ट: कल बारिश की संभावना है — सिंचाई रोकें।")
-    : (en?"☀️ Weather alert: dry spell continues — irrigate today.":"☀️ मौसम अलर्ट: सूखा जारी है — आज सिंचाई करें।");
-  toast(msg);
-}, 26000);
+  try{
+    const w = await getRealWeather();
+    const en = S.lang==="en";
+    const tomorrow = w.rows[1] || w.rows[0];
+    const rainy = tomorrow.rain>60 || w.rows[0].rain>50;
+    const msg = rainy
+      ? (en?"🌧️ Weather alert: rain expected — hold irrigation.":"🌧️ मौसम अलर्ट: बारिश की संभावना है — सिंचाई रोकें।")
+      : (en?"☀️ Weather alert: dry spell — irrigate today.":"☀️ मौसम अलर्ट: मौसम सूखा है — आज सिंचाई करें।");
+    toast(msg);
+  }catch(e){ /* no internet: stay silent instead of showing a wrong alert */ }
+}, 120000);
 
 /* ================= TRANSPORT — live driver tracking on OpenStreetMap (Leaflet) ================= */
 Object.assign(STR.hi, {
