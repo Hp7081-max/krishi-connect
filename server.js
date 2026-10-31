@@ -19,6 +19,7 @@ const walletRoutes = require('./routes/wallet');
 const toolRoutes = require('./routes/tools');
 const syncRoutes = require('./routes/sync');
 const returnRoutes = require('./routes/returns');
+const diseaseAIRoutes = require('./routes/diseaseAI');
 
 const app = express();
 const server = http.createServer(app);
@@ -41,9 +42,8 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Only expose the frontend script (NOT the whole project folder, which would leak data/db.json, source code, etc.)
 app.get('/api-client.js', (req, res) => res.sendFile(path.join(__dirname, 'api-client.js')));
-app.get('/voice.js', (req, res) => res.sendFile(path.join(__dirname, 'voice.js')));
+
 app.get('/disease-ai.js', (req, res) => res.sendFile(path.join(__dirname, 'disease-ai.js')));
-app.use('/api/disease-ai', requireAuth, require('./routes/diseaseAI'));
 
 // Serve fully final.html at root route
 app.get('/', (req, res) => {
@@ -59,6 +59,7 @@ app.use('/api/returns', requireAuth, returnRoutes);
 app.use('/api/equipment', requireAuth, equipmentRoutes);
 app.use('/api/wallet', requireAuth, walletRoutes);
 app.use('/api/tools', requireAuth, toolRoutes);
+app.use('/api/disease-ai', requireAuth, diseaseAIRoutes);
 app.use('/api/state', requireAuth, syncRoutes);
 
 // General health check
@@ -105,6 +106,7 @@ async function startServer() {
   // Connect to DB
   await connectDB();
   await dataService.seedMongoDBIfNeeded();
+  await dataService.applyAdminPassword();
 
   server.listen(PORT, () => {
     const dbStatus = getDBStatus();
