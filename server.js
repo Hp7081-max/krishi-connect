@@ -1,5 +1,6 @@
 require('dotenv').config();
 const http = require('http');
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -22,6 +23,8 @@ const returnRoutes = require('./routes/returns');
 const diseaseAIRoutes = require('./routes/diseaseAI');
 const gradeAIRoutes = require('./routes/gradeAI');
 const mandiRoutes = require('./routes/mandi');
+const chatRoutes = require('./routes/chat');
+const chatService = require('./services/chatService');
 
 const app = express();
 const server = http.createServer(app);
@@ -36,6 +39,8 @@ const io = new Server(server, {
 
 // Pass Socket.IO instance to dataService for live broadcasting
 dataService.setSocketIO(io);
+// Private chat uses its own Socket.IO namespace (/chat) and checks the login token itself
+chatService.setSocketIO(io);
 
 // Middlewares
 app.use(cors());
@@ -48,10 +53,24 @@ app.get('/api-client.js', (req, res) => res.sendFile(path.join(__dirname, 'api-c
 app.get('/voice.js', (req, res) => res.sendFile(path.join(__dirname, 'voice.js')));
 app.get('/mandi-live.js', (req, res) => res.sendFile(path.join(__dirname, 'mandi-live.js')));
 app.get('/disease-ai.js', (req, res) => res.sendFile(path.join(__dirname, 'disease-ai.js')));
+app.get('/chat-client.js', (req, res) => res.sendFile(path.join(__dirname, 'chat-client.js')));
 
 // Serve fully final.html at root route
+// The chat script is added automatically (unless the page already has a <script src="...chat-client.js"> tag).
+let appHtml = null;
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'fully final.html'));
+  try {
+    if (!appHtml) {
+      let html = fs.readFileSync(path.join(__dirname, 'fully final.html'), 'utf8');
+      if (!/<script[^>]+src=["'][^"']*chat-client\.js/i.test(html)) {
+        html = html.replace('</body>', '<script src="/chat-client.js"></script>\n</body>');
+      }
+      appHtml = html;
+    }
+    res.type('html').send(appHtml);
+  } catch (e) {
+    res.sendFile(path.join(__dirname, 'fully final.html'));
+  }
 });
 
 // API Routes
@@ -66,6 +85,7 @@ app.use('/api/tools', requireAuth, toolRoutes);
 app.use('/api/disease-ai', requireAuth, diseaseAIRoutes);
 app.use('/api/grade-ai', requireAuth, gradeAIRoutes);
 app.use('/api/mandi', requireAuth, mandiRoutes);
+app.use('/api/chat', chatRoutes); // does its own (always-on) login check
 app.use('/api/state', requireAuth, syncRoutes);
 
 // General health check
