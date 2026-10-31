@@ -20,6 +20,7 @@ const toolRoutes = require('./routes/tools');
 const syncRoutes = require('./routes/sync');
 const returnRoutes = require('./routes/returns');
 const diseaseAIRoutes = require('./routes/diseaseAI');
+const gradeAIRoutes = require('./routes/gradeAI');
 
 const app = express();
 const server = http.createServer(app);
@@ -60,6 +61,7 @@ app.use('/api/equipment', requireAuth, equipmentRoutes);
 app.use('/api/wallet', requireAuth, walletRoutes);
 app.use('/api/tools', requireAuth, toolRoutes);
 app.use('/api/disease-ai', requireAuth, diseaseAIRoutes);
+app.use('/api/grade-ai', requireAuth, gradeAIRoutes);
 app.use('/api/state', requireAuth, syncRoutes);
 
 // General health check

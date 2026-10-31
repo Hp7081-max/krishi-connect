@@ -795,7 +795,7 @@ const STR = {
     note:"संदेश (वैकल्पिक)", send_bid:"बोली भेजें", bid_sent:"बोली किसान को भेज दी",
     ask:"माँग रहे हैं", total:"कुल रकम", commission:"कमीशन",
     contract:"कॉन्ट्रैक्ट देखें", book_truck:"गाड़ी बुक करें", book_qc:"क्वालिटी जाँच",
-    truck_booked:"गाड़ी बुक हो गई", qc_booked:"क्वालिटी जाँच बुक हो गई",
+    truck_booked:"गाड़ी बुक हो गई", qc_booked:"क्वालिटी जाँच का अनुरोध दर्ज हुआ",
     no_deal_b:"अभी कोई सौदा नहीं", no_deal_s:"बोली मंज़ूर होते ही सौदा यहाँ दिखेगा",
     st_confirmed:"सौदा पक्का", st_pickup:"उठान", st_transit:"रास्ते में", st_delivered:"पहुँच गया",
     escrow:"एस्क्रो", held:"सुरक्षित", released:"जारी", release:"पैसा जारी करें",
@@ -878,7 +878,7 @@ const STR = {
     note:"Message (optional)", send_bid:"Send bid", bid_sent:"Bid sent to the farmer",
     ask:"Asking", total:"Deal value", commission:"Commission",
     contract:"View contract", book_truck:"Book a truck", book_qc:"Quality check",
-    truck_booked:"Truck booked", qc_booked:"Quality check booked",
+    truck_booked:"Truck booked", qc_booked:"Quality check request recorded",
     no_deal_b:"No deals yet", no_deal_s:"Accepted bids show up here",
     st_confirmed:"Confirmed", st_pickup:"Pickup", st_transit:"In transit", st_delivered:"Delivered",
     escrow:"Escrow", held:"Held", released:"Released", release:"Release payment",
@@ -1696,6 +1696,12 @@ function wireSell(){
         const url=c.toDataURL("image/jpeg",.7);
         $("#photoPrev").innerHTML=`<img src="${url}" alt="" style="width:110px;height:110px;object-fit:cover;border-radius:14px">`;
         $("#photoPrev").dataset.url=url;
+        try{
+          const bs=Math.min(1,1024/Math.max(img.width,img.height)), bc=document.createElement("canvas");
+          bc.width=Math.max(1,Math.round(img.width*bs)); bc.height=Math.max(1,Math.round(img.height*bs));
+          bc.getContext("2d").drawImage(img,0,0,bc.width,bc.height);
+          $("#photoPrev").dataset.big=bc.toDataURL("image/jpeg",.85);
+        }catch(e){ $("#photoPrev").dataset.big=""; }
         runGradeAI();
       };
       img.src=rd.result;
@@ -2179,7 +2185,7 @@ function renderBuyer(){
           <p class="small muted">${S.lang==="en"?"Verified fleet near the pickup mandi, billed per km.":"मंडी के पास वेरिफाइड गाड़ियाँ, प्रति किमी किराया।"}</p>
           <button class="btn sm" style="margin-top:10px" data-act="tab" data-v="transport">🚚 ${S.lang==="en"?"Open Transport Hub":"ट्रांसपोर्ट हब खोलें"}</button></div>
         <div class="card pad"><div style="font-size:28px">🔬</div><h3 style="margin-top:6px">${esc(t("book_qc"))}</h3>
-          <p class="small muted">${S.lang==="en"?"Third-party moisture, size and grading report before pickup.":"उठान से पहले नमी, साइज़ और ग्रेडिंग की जाँच रिपोर्ट।"}</p>
+          <p class="small muted">${S.lang==="en"?"Request a quality check before pickup. Lab reports are not automatic yet.":"उठान से पहले क्वालिटी जाँच का अनुरोध करें। लैब रिपोर्ट अभी अपने-आप नहीं आती।"}</p>
           <button class="btn sm ghost" style="margin-top:10px" data-act="svc-qc">${esc(t("book_qc"))}</button></div>
       </div>
       <div class="sec-head"><h2>${S.lang==="en"?"Fleet on standby":"उपलब्ध गाड़ियाँ"}</h2><button class="link" data-act="tab" data-v="transport">${S.lang==="en"?"Live Tracking →":"लाइव ट्रैकिंग →"}</button></div>
@@ -2443,7 +2449,7 @@ function dealCardHTML(d, who){
         <button class="btn sm ghost" data-act="assign" data-id="${d.id}">${d.transporter?"🚛 "+esc(d.transporter.name):esc(t("assign"))}</button>`:""}
     </div>
     ${d.transporter&&who!=="admin"?`<div class="tiny muted" style="margin-top:8px">🚛 ${esc(d.transporter.name)} · ${esc(d.transporter.veh)}</div>`:""}
-    ${d.quality?`<div class="tiny" style="margin-top:6px;color:var(--leaf)">🔬 ${S.lang==="en"?"Quality report":"क्वालिटी रिपोर्ट"}: ${esc(d.quality)}</div>`:""}
+    ${d.quality?`<div class="tiny" style="margin-top:6px;color:var(--leaf)">🔬 ${S.lang==="en"?"Quality check":"क्वालिटी जाँच"}: ${esc(d.quality)}</div>`:""}
   </article>`;
 }
 
@@ -4408,7 +4414,7 @@ function runSoilRec(){
 /* Optional: set this to your own backend URL that calls a vision model (e.g. Claude) and returns
    {grade:"A|B|C", score:0-100, reasons:["..."]}. Never put an API key in this file.
    Left empty, the grader below runs fully in the browser. */
-const GRADE_AI_ENDPOINT = "";
+const GRADE_AI_ENDPOINT = "/api/grade-ai";
 
 const GRADE_PROFILE = {   /* healthy colour (hue ranges, degrees) and minimum saturation per crop */
   tomato:{h:[[345,360],[0,18]], sat:.35}, onion:{h:[[300,360],[0,50]], sat:.18},
@@ -4478,14 +4484,14 @@ function showGradeResult(res, cropKey){
   const en=S.lang==="en", box=$("#gradeAI"); if(!box) return;
   if(!res.ok){
     box.innerHTML=`<div class="alert down"><span class="ic">📷</span><span><b>${en?"Couldn't read the photo":"फोटो साफ़ नहीं पढ़ी गई"}</b>
-      <p>${en?"Take a close, well-lit photo of the crop on a plain background and try again.":"फसल की पास से, अच्छी रोशनी में, सादे बैकग्राउंड पर फोटो लेकर दोबारा देखें।"}</p></span></div>`;
+      <p>${res.aiMsg?esc(res.aiMsg)+" ":""}${en?"Take a close, well-lit photo of the crop on a plain background and try again.":"फसल की पास से, अच्छी रोशनी में, सादे बैकग्राउंड पर फोटो लेकर दोबारा देखें।"}</p></span></div>`;
     return;
   }
   const sel=$("#fGrade"); if(sel) sel.value=res.grade;
   const cls = res.grade==="A"?"good":res.grade==="B"?"":"down";
   const reasons=(res.reasons||gradeReasons(res)).map(x=>`<li>${esc(x)}</li>`).join("");
   box.innerHTML=`<div class="alert ${cls}"><span class="ic">🤖</span><span>
-      <b>${en?"AI grade":"AI ग्रेड"}: ${esc(gradeLabel(res.grade))} · ${res.score}/100</b>
+      <b>${res.src==="ai"?(en?"AI grade (estimate)":"AI ग्रेड (अनुमान)"):(en?"Photo-based estimate":"फोटो अनुमान")}: ${esc(gradeLabel(res.grade))} · ${res.score}/100</b>
       <div class="gr-bar"><i style="width:${Math.max(4,Math.min(100,res.score))}%"></i></div>
       <ul class="gr-list">${reasons}</ul>
       <p class="tiny muted" style="margin-top:8px">${en?"Grade filled in above — you can change it. This is a photo-based estimate (colour, spots, uniformity), not a lab quality test.":"ग्रेड ऊपर भर दिया गया है — बदल सकते हैं। यह फोटो (रंग, दाग, एकरूपता) पर आधारित अनुमान है, लैब जाँच नहीं।"}</p>
@@ -4510,11 +4516,21 @@ function runGradeAI(){
     img.src=url;
   };
   if(GRADE_AI_ENDPOINT && typeof fetch==="function"){
-    fetch(GRADE_AI_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image:url,crop:cropKey,lang:S.lang})})
+    let token=null; try{ token=localStorage.getItem("krishi_token"); }catch(e){}
+    const base=(window.KrishiAPI&&window.KrishiAPI.baseUrl)||"";
+    const ctrl=new AbortController(), timer=setTimeout(()=>ctrl.abort(),45000);
+    fetch(base+GRADE_AI_ENDPOINT,{method:"POST",signal:ctrl.signal,
+        headers:Object.assign({"Content-Type":"application/json"},token?{"Authorization":"Bearer "+token}:{}),
+        body:JSON.stringify({image:prev.dataset.big||url,crop:cropKey,lang:S.lang})})
       .then(r=>r.json()).then(j=>{
-        if(j && /^[ABC]$/.test(j.grade)) showGradeResult({ok:true, grade:j.grade, score:Math.round(j.score||70), reasons:Array.isArray(j.reasons)?j.reasons.slice(0,5):[]}, cropKey);
-        else local();
-      }).catch(local);
+        clearTimeout(timer);
+        const d=j&&j.success&&j.data;
+        if(d && d.gradable===false){
+          showGradeResult({ok:false, reason:"unclear", aiMsg:(d.photoIssue||(d.cropMatches===false?(en?"The photo does not look like the selected crop.":"फोटो चुनी हुई फसल जैसी नहीं लग रही।"):""))}, cropKey);
+        } else if(d && /^[ABC]$/.test(d.grade)) {
+          showGradeResult({ok:true, src:"ai", grade:d.grade, score:Math.round(d.score||0), reasons:Array.isArray(d.reasons)?d.reasons.slice(0,5):[]}, cropKey);
+        } else local();
+      }).catch(()=>{ clearTimeout(timer); local(); });
   } else local();
 }
 
@@ -4734,7 +4750,7 @@ document.addEventListener("click", e=>{
     case "svc-qc": {
       const d=id&&S.deals.find(x=>x.id===id);
       if(d){
-        d.quality = S.lang==="en"?"Moisture 11.4% · Grade A confirmed":"नमी 11.4% · ग्रेड A पुष्ट";
+        d.quality = S.lang==="en"?"Quality check requested — report will appear here when ready":"क्वालिटी जाँच का अनुरोध दर्ज — रिपोर्ट आने पर यहाँ दिखेगी";
         if(window.KrishiAPI && window.KrishiAPI.isOnline){
           window.KrishiAPI.bookQC(d._id || d.id, d.quality).catch(()=>{});
         }
