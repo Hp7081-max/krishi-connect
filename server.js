@@ -25,6 +25,7 @@ const gradeAIRoutes = require('./routes/gradeAI');
 const mandiRoutes = require('./routes/mandi');
 const chatRoutes = require('./routes/chat');
 const chatService = require('./services/chatService');
+const { mountChatExtras } = require('./routes/chatExtras'); // offer, photo, voice, mandi rate cards
 
 const app = express();
 const server = http.createServer(app);
@@ -55,8 +56,14 @@ app.get('/mandi-live.js', (req, res) => res.sendFile(path.join(__dirname, 'mandi
 app.get('/disease-ai.js', (req, res) => res.sendFile(path.join(__dirname, 'disease-ai.js')));
 app.get('/chat-client.js', (req, res) => res.sendFile(path.join(__dirname, 'chat-client.js')));
 
+// Chat extras (offer / listing card / voice / photo / mandi rate) + mic position
+app.get('/chat-extras.js', (req, res) => res.sendFile(path.join(__dirname, 'chat-extras.js')));
+app.get('/chat-extras.css', (req, res) => res.sendFile(path.join(__dirname, 'chat-extras.css')));
+app.get('/mic-position.js', (req, res) => res.sendFile(path.join(__dirname, 'mic-position.js')));
+
 // Serve fully final.html at root route
 // The chat script is added automatically (unless the page already has a <script src="...chat-client.js"> tag).
+// Same for the chat extras + mic position files.
 let appHtml = null;
 app.get('/', (req, res) => {
   try {
@@ -64,6 +71,13 @@ app.get('/', (req, res) => {
       let html = fs.readFileSync(path.join(__dirname, 'fully final.html'), 'utf8');
       if (!/<script[^>]+src=["'][^"']*chat-client\.js/i.test(html)) {
         html = html.replace('</body>', '<script src="/chat-client.js"></script>\n</body>');
+      }
+      if (!/chat-extras\.js/i.test(html)) {
+        html = html.replace('</head>', '<link rel="stylesheet" href="/chat-extras.css">\n</head>');
+        html = html.replace(
+          '</body>',
+          '<script src="/chat-extras.js" defer></script>\n<script src="/mic-position.js" defer></script>\n</body>'
+        );
       }
       appHtml = html;
     }
@@ -86,6 +100,7 @@ app.use('/api/disease-ai', requireAuth, diseaseAIRoutes);
 app.use('/api/grade-ai', requireAuth, gradeAIRoutes);
 app.use('/api/mandi', requireAuth, mandiRoutes);
 app.use('/api/chat', chatRoutes); // does its own (always-on) login check
+mountChatExtras(app); // /api/chat-extras (checks the login token itself) + /uploads
 app.use('/api/state', requireAuth, syncRoutes);
 
 // General health check
