@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-3.8-flash';
 const MAX_DATAURL_CHARS = 6000000;
 const TIMEOUT_MS = 40000;
 
@@ -109,7 +109,7 @@ router.post('/', async (req, res) => {
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify({
           contents: [{ parts: [{ text: buildPrompt(cropKey, language) }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
-          generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
+          generationConfig: { responseMimeType: 'application/json' }
         }),
         signal: ctrl.signal
       });
