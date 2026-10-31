@@ -16,12 +16,32 @@
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const pick = (pairs) => pairs.find(([o, n]) => o && typeof o[n] === 'function');
 
+  // Login token (JWT) browser storage me kisi bhi naam se ho, yahan dhoondh liya jata hai
+  function findToken() {
+    for (const store of [window.localStorage, window.sessionStorage]) {
+      try {
+        for (let i = 0; i < store.length; i++) {
+          const m = String(store.getItem(store.key(i)) || '').match(/eyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]{5,}/);
+          if (m) return m[0];
+        }
+      } catch (e) { /* storage band hai */ }
+    }
+    return null;
+  }
+  function tokenUser(t) {
+    try {
+      const p = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      const id = p.id || p._id || p.userId || p.uid || p.sub;
+      return id ? { id: String(id) } : null;
+    } catch (e) { return null; }
+  }
+
   const CONFIG = {
     apiBase: '/api/chat-extras',
 
     // Login wala user: { id }
-    getUser: () => window.currentUser || safeJSON(lsGet('user')) || {},
-    getAuthHeaders: () => { const t = lsGet('token'); return t ? { Authorization: 'Bearer ' + t } : {}; },
+    getUser: () => (findToken() && tokenUser(findToken())) || window.currentUser || safeJSON(lsGet('user')) || {},
+    getAuthHeaders: () => { const t = findToken(); return t ? { Authorization: 'Bearer ' + t } : {}; },
 
     // Abhi kaun si chat khuli hai, aur samne wala kaun hai
     getConversationId: () =>
