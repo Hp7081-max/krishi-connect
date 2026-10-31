@@ -32,6 +32,11 @@
         headers
       });
       const data = await res.json();
+      if (res.status === 401 && token && !endpoint.startsWith('/api/auth/')) {
+        // Token expired or invalid: forget it so the user logs in again
+        token = null;
+        localStorage.removeItem('krishi_token');
+      }
       if (!res.ok) {
         throw new Error(data.message || `API error (${res.status})`);
       }
@@ -324,6 +329,7 @@
     _startPollingSync(S, renderFn) {
       if (this._pollTimer) clearInterval(this._pollTimer);
       this._pollTimer = setInterval(async () => {
+        if (!token) return; // not logged in yet: nothing to fetch
         try {
           const res = await apiFetch('/api/state/sync');
           if (res && res.success && res.data) {

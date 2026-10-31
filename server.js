@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 
 const { connectDB, getDBStatus } = require('./config/db');
 const dataService = require('./services/dataService');
+const { requireAuth } = require('./middleware/auth');
 
 // Routers
 const authRoutes = require('./routes/auth');
@@ -48,14 +49,14 @@ app.get('/', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/listings', listingRoutes);
-app.use('/api/bids', bidRoutes);
-app.use('/api/deals', dealRoutes);
-app.use('/api/returns', returnRoutes);
-app.use('/api/equipment', equipmentRoutes);
-app.use('/api/wallet', walletRoutes);
-app.use('/api/tools', toolRoutes);
-app.use('/api/state', syncRoutes);
+app.use('/api/listings', requireAuth, listingRoutes);
+app.use('/api/bids', requireAuth, bidRoutes);
+app.use('/api/deals', requireAuth, dealRoutes);
+app.use('/api/returns', requireAuth, returnRoutes);
+app.use('/api/equipment', requireAuth, equipmentRoutes);
+app.use('/api/wallet', requireAuth, walletRoutes);
+app.use('/api/tools', requireAuth, toolRoutes);
+app.use('/api/state', requireAuth, syncRoutes);
 
 // General health check
 app.get('/api/health', (req, res) => {
