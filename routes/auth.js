@@ -6,6 +6,7 @@ const dataService = require('../services/dataService');
 const JWT_SECRET = process.env.JWT_SECRET || 'krishi_connect_super_secret_jwt_key_2026_agro_market';
 
 const otpService = require('../services/otpService');
+const { isAuthRequired } = require('../middleware/auth');
 
 // Set OTP_LOGIN=off in Render environment to skip OTP at login (register & reset still use OTP)
 const LOGIN_OTP_ENABLED = () => String(process.env.OTP_LOGIN || 'on').toLowerCase() !== 'off';
@@ -61,6 +62,9 @@ router.post('/register', async (req, res) => {
     }
     if (!otp) {
       return res.status(400).json({ success: false, message: 'Email OTP daalna zaroori hai.' });
+    }
+    if (isAuthRequired() && String(role || '').toLowerCase() === 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin account khud register nahi ho sakta.' });
     }
     await otpService.verifyOtp('register', email, otp);
 
