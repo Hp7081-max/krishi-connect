@@ -33,7 +33,7 @@
   /* ---------- styles ---------- */
   var css = document.createElement("style");
   css.textContent =
-  "#kcFab{position:fixed;right:14px;bottom:88px;z-index:9998;width:54px;height:54px;border-radius:50%;border:0;background:var(--leaf,#2E6B4F);color:#fff;font-size:24px;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;display:none}"+
+  "#kcFab{position:fixed;left:14px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:9998;width:54px;height:54px;border-radius:50%;border:0;background:var(--leaf,#2E6B4F);color:#fff;font-size:24px;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;display:none}"+
   "#kcFab b{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:10px;background:var(--chilli,#BE3B2B);color:#fff;font-size:12px;line-height:20px;padding:0 5px;display:none}"+
   "#kcPanel{position:fixed;inset:0;z-index:9999;background:var(--paper,#EFF2EA);color:var(--ink,#16261D);display:none;flex-direction:column;font-family:inherit;padding-top:env(safe-area-inset-top,0px)}"+
   "#kcPanel.on{display:flex}"+
