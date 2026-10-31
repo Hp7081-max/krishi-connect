@@ -1230,6 +1230,14 @@ function mandiInner(key){
 }
 function mandiLive(key){ return `<span class="mandi-live" data-crop="${key}">${mandiInner(key)}</span>`; }
 function refreshMandi(){ document.querySelectorAll(".mandi-live").forEach(el=>{ el.innerHTML=mandiInner(el.dataset.crop); }); }
+/* Honest label: prices and forecasts below are simulated sample data, not real mandi rates */
+function demoNote(kind){
+  const en = S.lang==="en";
+  const txt = kind==="forecast"
+    ? (en ? "Demo forecast — sample numbers, not real advice" : "डेमो अनुमान — नमूना आंकड़े, असली सलाह नहीं")
+    : (en ? "Demo data — sample prices, not real mandi rates" : "डेमो डेटा — नमूना भाव, असली मंडी भाव नहीं");
+  return `<div style="margin:6px 0"><span class="tag gold">⚠️ ${txt}</span></div>`;
+}
 
 /* ---------------- helpers ---------------- */
 const $  = s => document.querySelector(s);
@@ -1475,10 +1483,10 @@ function renderFarmer(){
       </div>
 
       <div class="sec-head"><h2>${esc(t("ai_head"))}</h2></div>
-      <div class="stack">${forecastAlerts()}</div>
+      ${demoNote("forecast")}<div class="stack">${forecastAlerts()}</div>
 
       <div class="sec-head"><h2>${esc(t("sec_prices"))}</h2><button class="link" data-act="tab" data-v="mandi">${esc(t("all"))}</button></div>
-      <div class="card">${priceRowsHTML(4)}</div>
+      ${demoNote()}<div class="card">${priceRowsHTML(4)}</div>
 
       <div class="sec-head"><h2>${esc(t("sec_mylist"))}</h2></div>
       <div class="stack">${myListings().length? myListings().map(l=>listingCardHTML(l,true)).join("")
@@ -1542,10 +1550,10 @@ function renderFarmer(){
   }
   else if(tab==="mandi"){
     v.innerHTML = `
-      <div class="sec-head"><h2>${esc(t("sec_prices"))}</h2><span class="tag green">● live</span></div>
-      <div class="card">${priceRowsHTML()}</div>
+      <div class="sec-head"><h2>${esc(t("sec_prices"))}</h2><span class="tag gold">● demo</span></div>
+      ${demoNote()}<div class="card">${priceRowsHTML()}</div>
       <div class="sec-head"><h2>${esc(t("ai_head"))}</h2></div>
-      <div class="stack">${forecastAlerts()}</div>`;
+      ${demoNote("forecast")}<div class="stack">${forecastAlerts()}</div>`;
   }
   else if(tab==="bids"){
     const myLotsWithBids = myListings().filter(l=>bidsFor(l.id).length);
@@ -2246,7 +2254,7 @@ function renderAdmin(){
             <div style="width:${(q/cmax*100).toFixed(1)}%;height:100%;background:var(--leaf)"></div></div>
         </div>`).join("")}</div>
       <div class="sec-head"><h2>${esc(t("ai_head"))}</h2></div>
-      <div class="stack">${forecastAlerts()}</div>`;
+      ${demoNote("forecast")}<div class="stack">${forecastAlerts()}</div>`;
   }
   else if(tab==="returns"){
     renderAdminReturns(v);
@@ -4648,12 +4656,12 @@ Object.assign(STR.en, {
 });
 
 Object.assign(STR.hi, {
-  t_contracts:"अनुबंध", mandi_live:"आज का मंडी भाव", ct_head:"सभी अनुबंध", ct_none_b:"अभी कोई अनुबंध नहीं",
+  t_contracts:"अनुबंध", mandi_live:"डेमो मंडी भाव", ct_head:"सभी अनुबंध", ct_none_b:"अभी कोई अनुबंध नहीं",
   ct_none_s:"किसान बोली मंज़ूर करते ही अनुबंध यहाँ सेव हो जाएगा", ct_seller:"बेचने वाला (किसान)", ct_buyer:"खरीदने वाला",
   ct_phone:"फ़ोन", ct_goods:"माल का करार", ct_view:"पूरा अनुबंध देखें", ct_saved:"अनुबंध एडमिन में सेव हो गया"
 });
 Object.assign(STR.en, {
-  t_contracts:"Contracts", mandi_live:"Live mandi rate", ct_head:"All contracts", ct_none_b:"No contracts yet",
+  t_contracts:"Contracts", mandi_live:"Demo mandi rate", ct_head:"All contracts", ct_none_b:"No contracts yet",
   ct_none_s:"A contract is saved here as soon as a farmer accepts a bid", ct_seller:"Seller (farmer)", ct_buyer:"Buyer",
   ct_phone:"Phone", ct_goods:"Goods agreement", ct_view:"View full agreement", ct_saved:"Contract saved in Admin"
 });
