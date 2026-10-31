@@ -42,6 +42,8 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 // Only expose the frontend script (NOT the whole project folder, which would leak data/db.json, source code, etc.)
 app.get('/api-client.js', (req, res) => res.sendFile(path.join(__dirname, 'api-client.js')));
 app.get('/voice.js', (req, res) => res.sendFile(path.join(__dirname, 'voice.js')));
+app.get('/disease-ai.js', (req, res) => res.sendFile(path.join(__dirname, 'disease-ai.js')));
+app.use('/api/disease-ai', requireAuth, require('./routes/diseaseAI'));
 
 // Serve fully final.html at root route
 app.get('/', (req, res) => {
