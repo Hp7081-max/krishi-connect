@@ -4599,7 +4599,7 @@ setInterval(()=>{
 
 setInterval(()=>{
   const open=S.listings.filter(l=>l.status==="active" && l.mine);
-  if(!open.length) return;
+  return;
   if(Math.random()>.45) return;
   const l=open[Math.floor(Math.random()*open.length)];
   const buyer=BUYERS[Math.floor(Math.random()*BUYERS.length)];
