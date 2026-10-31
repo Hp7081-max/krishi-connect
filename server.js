@@ -109,7 +109,7 @@ async function startServer() {
   // Connect to DB
   await connectDB();
   await dataService.seedMongoDBIfNeeded();
-  await dataService.applyAdminPassword();
+  if (typeof dataService.applyAdminPassword === 'function') await dataService.applyAdminPassword();
 
   server.listen(PORT, () => {
     const dbStatus = getDBStatus();
