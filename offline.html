@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2e7d32">
+<title>Krishi Connect — Offline</title>
+<style>
+  :root { --bg:#f4f8f2; --card:#ffffff; --text:#1b2a1b; --muted:#5c6b5c; --green:#2e7d32; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#121a12; --card:#1b251b; --text:#e8f0e8; --muted:#9db09d; --green:#66bb6a; }
+  }
+  html, body { height:100%; margin:0; }
+  body { display:flex; align-items:center; justify-content:center; background:var(--bg); color:var(--text);
+         font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding:20px; box-sizing:border-box; }
+  .box { max-width:360px; text-align:center; background:var(--card); border-radius:20px; padding:32px 24px;
+         box-shadow:0 4px 24px rgba(0,0,0,.08); }
+  .ic { font-size:48px; }
+  h1 { font-size:20px; margin:12px 0 6px; }
+  p { color:var(--muted); line-height:1.5; margin:6px 0; font-size:15px; }
+  button { margin-top:18px; padding:12px 26px; border:0; border-radius:999px; background:var(--green); color:#fff;
+           font:inherit; font-weight:600; cursor:pointer; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="ic">📡</div>
+    <h1>इंटरनेट नहीं है</h1>
+    <p>कनेक्शन वापस आने पर Krishi Connect फिर से खुल जाएगा।</p>
+    <h1 style="font-size:16px;margin-top:18px">You are offline</h1>
+    <p>Krishi Connect will open again when your connection is back.</p>
+    <button onclick="location.reload()">दोबारा कोशिश करें / Try again</button>
+  </div>
+</body>
+</html>
