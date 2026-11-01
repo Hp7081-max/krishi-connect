@@ -51,6 +51,14 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Only expose the frontend script (NOT the whole project folder, which would leak data/db.json, source code, etc.)
 app.get('/api-client.js', (req, res) => res.sendFile(path.join(__dirname, 'api-client.js')));
+// PWA files (install-as-app support)
+['manifest.json','sw.js','offline.html','icon-192.png','icon-512.png','apple-touch-icon.png'].forEach(function (f) {
+  app.get('/' + f, function (req, res) {
+    if (f === 'sw.js') res.set('Cache-Control', 'no-cache');
+    if (f === 'manifest.json') res.type('application/manifest+json');
+    res.sendFile(path.join(__dirname, f));
+  });
+});
 
 app.get('/voice.js', (req, res) => res.sendFile(path.join(__dirname, 'voice.js')));
 app.get('/mandi-live.js', (req, res) => res.sendFile(path.join(__dirname, 'mandi-live.js')));
