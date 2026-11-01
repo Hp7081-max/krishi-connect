@@ -28,6 +28,7 @@ const chatService = require('./services/chatService');
 const { mountChatExtras } = require('./routes/chatExtras'); // offer, photo, voice, mandi rate cards
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Setup Socket.IO
