@@ -8,8 +8,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'krishi_connect_super_secret_jwt_ke
 const otpService = require('../services/otpService');
 const { isAuthRequired } = require('../middleware/auth');
 
-// Set OTP_LOGIN=off in Render environment to skip OTP at login (register & reset still use OTP)
-const LOGIN_OTP_ENABLED = () => String(process.env.OTP_LOGIN || 'on').toLowerCase() !== 'off';
+// Login par OTP ab DEFAULT band hai: OTP sirf naya account banate waqt (register) aur forgot password me aata hai.
+// Agar kabhi login par bhi OTP chahiye to Render me OTP_LOGIN=on set karein.
+const LOGIN_OTP_ENABLED = () => String(process.env.OTP_LOGIN || 'off').toLowerCase() === 'on';
 
 // Emails are case-insensitive: find the account whether it was stored as typed or in lowercase
 async function resolveContact(raw) {
