@@ -648,21 +648,9 @@ body:has(.kv-sheet) .kv-fab{top:auto;bottom:calc(96px + env(safe-area-inset-bott
       <!-- Registration Form View -->
       <div id="kcRegisterForm" style="display:none">
         <div class="kc-field">
-          <label id="kcRegNameLabel">Full Name</label>
-          <input id="kcRegName" class="kc-input" type="text" autocomplete="name"
-                 placeholder="Enter your full name">
-        </div>
-
-        <div class="kc-field">
           <label id="kcRegContactLabel">Email (OTP yahin aayega)</label>
           <input id="kcRegContact" class="kc-input" type="email" autocomplete="email"
                  placeholder="Enter your email">
-        </div>
-
-        <div class="kc-field">
-          <label id="kcRegPhoneLabel">Mobile number (optional)</label>
-          <input id="kcRegPhone" class="kc-input" type="tel" autocomplete="tel"
-                 placeholder="10 digit mobile number">
         </div>
 
         <div class="kc-field">
@@ -670,14 +658,6 @@ body:has(.kv-sheet) .kv-fab{top:auto;bottom:calc(96px + env(safe-area-inset-bott
           <div class="kc-password-wrap">
             <input id="kcRegPassword" class="kc-input" type="password" autocomplete="new-password" placeholder="Create a password">
             <button type="button" class="kc-eye" id="kcEyeReg" aria-label="Show password">👁</button>
-          </div>
-        </div>
-
-        <div class="kc-field">
-          <label id="kcRegPassword2Label">Re-enter Password</label>
-          <div class="kc-password-wrap">
-            <input id="kcRegPassword2" class="kc-input" type="password" autocomplete="new-password" placeholder="Re-enter password to confirm">
-            <button type="button" class="kc-eye" id="kcEyeReg2" aria-label="Show password">👁</button>
           </div>
         </div>
 
@@ -5370,7 +5350,7 @@ if(window.KrishiAPI){
       if($("kcContact").value && !$("kcRegContact").value){
         $("kcRegContact").value = $("kcContact").value;
       }
-      setTimeout(()=>{$("kcRegName")&&$("kcRegName").focus();}, 50);
+      setTimeout(()=>{$("kcRegContact")&&$("kcRegContact").focus();}, 50);
     } else {
       $("kcRegisterForm").style.display = "none";
       $("kcLoginForm").style.display = "block";
@@ -5439,25 +5419,21 @@ if(window.KrishiAPI){
     if($("kcSubmitRegister")){
       $("kcSubmitRegister").addEventListener("click", async ()=>{
         const t=I18N[lang];
-        const name=$("kcRegName").value.trim();
+        if(window.__kcRegBusy) return;           // double-click guard
         const contact=$("kcRegContact").value.trim().toLowerCase();
-        const phone=$("kcRegPhone").value.trim();
         const otp=$("kcRegOtp").value.trim();
         const p1=$("kcRegPassword").value.trim();
-        const p2=$("kcRegPassword2").value.trim();
+        const phone="";
+        // Signup now asks only Email + Password (+ OTP). Name is taken from the email.
+        const name=contact.split("@")[0].replace(/[._-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase()) || "Krishi User";
 
-        if(!name || !contact || !p1 || !p2){
-          toast(t.fillAllFields);
+        if(!contact || !p1){
+          toast(lang==="hi" ? "कृपया ईमेल और पासवर्ड भरें।" : "Please enter email and password.");
           return;
         }
 
         if(p1.length < 4){
           toast(lang==="hi" ? "पासवर्ड कम से कम 4 अक्षरों का होना चाहिए।" : "Password must be at least 4 characters long.");
-          return;
-        }
-
-        if(p1 !== p2){
-          toast(t.passMismatch);
           return;
         }
 
@@ -5471,7 +5447,9 @@ if(window.KrishiAPI){
             // Step 1: send OTP to email
             if($("kcRegOtpBox").style.display === "none"){
               toast("⏳ OTP bheja ja raha hai...");
-              await window.KrishiAPI.sendOtp(contact, "register");
+              window.__kcRegBusy=true; $("kcSubmitRegister").disabled=true;
+              try{ await window.KrishiAPI.sendOtp(contact, "register"); }
+              finally{ window.__kcRegBusy=false; $("kcSubmitRegister").disabled=false; }
               $("kcRegOtpBox").style.display = "block";
               $("kcSubmitRegister").textContent = "Verify OTP & Create account";
               toast("📧 OTP aapke email par bhej diya gaya hai (Spam bhi dekhein).");

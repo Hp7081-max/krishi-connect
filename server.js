@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const { Server } = require('socket.io');
 
 const { connectDB, getDBStatus } = require('./config/db');
@@ -45,12 +46,14 @@ dataService.setSocketIO(io);
 chatService.setSocketIO(io);
 
 // Middlewares
+app.use(compression());          // gzip: HTML/JS/JSON 70-80% chhote -> app fast load hota hai
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Only expose the frontend script (NOT the whole project folder, which would leak data/db.json, source code, etc.)
-app.get('/api-client.js', (req, res) => res.sendFile(path.join(__dirname, 'api-client.js')));
+const sendStatic = (f) => (req, res) => res.sendFile(path.join(__dirname, f), { maxAge: '1h' });
+app.get('/api-client.js', sendStatic('api-client.js'));
 // PWA files (install-as-app support)
 ['manifest.json','sw.js','offline.html','icon-192.png','icon-512.png','apple-touch-icon.png'].forEach(function (f) {
   app.get('/' + f, function (req, res) {
@@ -60,15 +63,15 @@ app.get('/api-client.js', (req, res) => res.sendFile(path.join(__dirname, 'api-c
   });
 });
 
-app.get('/voice.js', (req, res) => res.sendFile(path.join(__dirname, 'voice.js')));
-app.get('/mandi-live.js', (req, res) => res.sendFile(path.join(__dirname, 'mandi-live.js')));
-app.get('/disease-ai.js', (req, res) => res.sendFile(path.join(__dirname, 'disease-ai.js')));
-app.get('/chat-client.js', (req, res) => res.sendFile(path.join(__dirname, 'chat-client.js')));
+app.get('/voice.js', sendStatic('voice.js'));
+app.get('/mandi-live.js', sendStatic('mandi-live.js'));
+app.get('/disease-ai.js', sendStatic('disease-ai.js'));
+app.get('/chat-client.js', sendStatic('chat-client.js'));
 
 // Chat extras (offer / listing card / voice / photo / mandi rate) + mic position
-app.get('/chat-extras.js', (req, res) => res.sendFile(path.join(__dirname, 'chat-extras.js')));
-app.get('/chat-extras.css', (req, res) => res.sendFile(path.join(__dirname, 'chat-extras.css')));
-app.get('/mic-position.js', (req, res) => res.sendFile(path.join(__dirname, 'mic-position.js')));
+app.get('/chat-extras.js', sendStatic('chat-extras.js'));
+app.get('/chat-extras.css', sendStatic('chat-extras.css'));
+app.get('/mic-position.js', sendStatic('mic-position.js'));
 
 // Serve fully final.html at root route
 // The chat script is added automatically (unless the page already has a <script src="...chat-client.js"> tag).
@@ -90,6 +93,7 @@ app.get('/', (req, res) => {
       }
       appHtml = html;
     }
+    res.set('Cache-Control', 'no-cache'); // HTML hamesha taaza, JS/CSS cache hote hain
     res.type('html').send(appHtml);
   } catch (e) {
     res.sendFile(path.join(__dirname, 'fully final.html'));
