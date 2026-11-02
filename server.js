@@ -86,15 +86,7 @@ app.get('/', (req, res) => {
   try {
     if (!appHtml) {
       let html = fs.readFileSync(path.join(__dirname, 'fully final.html'), 'utf8');
-      if (!/mic-position\.js/i.test(html)) {
-        html = html.replace('</body>', '<script src="/mic-position.js" defer></script>\n</body>');
-      }
-      if (!/voice-listing\.js/i.test(html)) {
-        html = html.replace(
-          '</body>',
-          '<script src="/voice-parser.js"></script>\n<script src="/voice-listing.js"></script>\n</body>'
-        );
-      }
+      
       appHtml = html;
     }
     res.set('Cache-Control', 'no-cache'); // HTML hamesha taaza, JS/CSS cache hote hain
