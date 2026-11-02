@@ -26,7 +26,6 @@ const gradeAIRoutes = require('./routes/gradeAI');
 const mandiRoutes = require('./routes/mandi');
 const chatRoutes = require('./routes/chat');
 const chatService = require('./services/chatService');
-const { mountChatExtras } = require('./routes/chatExtras'); // offer, photo, voice, mandi rate cards
 
 const app = express();
 app.set('trust proxy', 1);
@@ -44,6 +43,8 @@ const io = new Server(server, {
 dataService.setSocketIO(io);
 // Private chat uses its own Socket.IO namespace (/chat) and checks the login token itself
 chatService.setSocketIO(io);
+// New chat (routes/chat.js): realtime messages. Optional - chat works via polling without it.
+if (chatRoutes.attachSocket) chatRoutes.attachSocket(io);
 
 // Middlewares
 app.use(compression());          // gzip: HTML/JS/JSON 70-80% chhote -> app fast load hota hai
@@ -70,28 +71,23 @@ app.get('/mandi-live.js', sendStatic('mandi-live.js'));
 app.get('/disease-ai.js', sendStatic('disease-ai.js'));
 app.get('/chat-client.js', sendStatic('chat-client.js'));
 
-// Chat extras (offer / listing card / voice / photo / mandi rate) + mic position
-app.get('/chat-extras.js', sendStatic('chat-extras.js'));
-app.get('/chat-extras.css', sendStatic('chat-extras.css'));
+// New chat widget + single voice script (add their <script> tags in fully final.html)
+app.get('/chat-widget.js', sendStatic('chat-widget.js'));
+app.get('/voice-single.js', sendStatic('voice-single.js'));
+
+// Mic position
 app.get('/mic-position.js', sendStatic('mic-position.js'));
 
 // Serve fully final.html at root route
-// The chat script is added automatically (unless the page already has a <script src="...chat-client.js"> tag).
-// Same for the chat extras + mic position files.
+// Voice + mic position files are added automatically (unless the page already has them).
+// NOTE: old chat-client.js / chat-extras are no longer auto-injected - the new chat-widget.js replaces them.
 let appHtml = null;
 app.get('/', (req, res) => {
   try {
     if (!appHtml) {
       let html = fs.readFileSync(path.join(__dirname, 'fully final.html'), 'utf8');
-      if (!/<script[^>]+src=["'][^"']*chat-client\.js/i.test(html)) {
-        html = html.replace('</body>', '<script src="/chat-client.js"></script>\n</body>');
-      }
-      if (!/chat-extras\.js/i.test(html)) {
-        html = html.replace('</head>', '<link rel="stylesheet" href="/chat-extras.css">\n</head>');
-        html = html.replace(
-          '</body>',
-          '<script src="/chat-extras.js" defer></script>\n<script src="/mic-position.js" defer></script>\n</body>'
-        );
+      if (!/mic-position\.js/i.test(html)) {
+        html = html.replace('</body>', '<script src="/mic-position.js" defer></script>\n</body>');
       }
       if (!/voice-listing\.js/i.test(html)) {
         html = html.replace(
@@ -121,7 +117,6 @@ app.use('/api/disease-ai', requireAuth, diseaseAIRoutes);
 app.use('/api/grade-ai', requireAuth, gradeAIRoutes);
 app.use('/api/mandi', requireAuth, mandiRoutes);
 app.use('/api/chat', chatRoutes); // does its own (always-on) login check
-mountChatExtras(app); // /api/chat-extras (checks the login token itself) + /uploads
 app.use('/api/state', requireAuth, syncRoutes);
 
 // General health check
