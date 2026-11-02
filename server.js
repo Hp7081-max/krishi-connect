@@ -64,6 +64,8 @@ app.get('/api-client.js', sendStatic('api-client.js'));
 });
 
 app.get('/voice.js', sendStatic('voice.js'));
+app.get('/voice-parser.js', sendStatic('voice-parser.js'));
+app.get('/voice-listing.js', sendStatic('voice-listing.js'));
 app.get('/mandi-live.js', sendStatic('mandi-live.js'));
 app.get('/disease-ai.js', sendStatic('disease-ai.js'));
 app.get('/chat-client.js', sendStatic('chat-client.js'));
