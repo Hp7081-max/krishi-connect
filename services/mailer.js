@@ -33,7 +33,12 @@ async function sendOtpEmail(to, code, purpose) {
       <p style="color:#555;font-size:13px;margin-top:14px">Ye OTP 5 minute tak valid hai. Ise kisi ko na batayein. Agar ye aapne nahi manga, to is email ko ignore karein.</p>
     </div>`;
 
-  const res = await fetch(BREVO_URL, {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10000); // 10 sec se zyada nahi rukega
+  let res;
+  try {
+  res = await fetch(BREVO_URL, {
+    signal: ctrl.signal,
     method: 'POST',
     headers: {
       'accept': 'application/json',
@@ -48,6 +53,12 @@ async function sendOtpEmail(to, code, purpose) {
       textContent: `Krishi Connect OTP: ${code}. Ye 5 minute tak valid hai. Kisi ko na batayein.`
     })
   });
+  } catch (e) {
+    console.error('Brevo request failed:', e.message);
+    throw new Error('Email bhejne me dikkat aayi. Thodi der baad dobara try karein.');
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     let detail = '';
