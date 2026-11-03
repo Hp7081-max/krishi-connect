@@ -369,19 +369,31 @@ td b{font-family:var(--fs-display)}
 .contract h4{font-size:15px;margin-bottom:6px}
 .contract .sig{display:flex;justify-content:space-between;margin-top:18px;font-size:12px;color:var(--ink-3)}
 
-/* ---- global voice control ---- */
-.kv-fab{position:fixed;right:14px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:95;width:58px;height:58px;border-radius:50%;
+/* ---- global voice control ----
+   FLOATING BUTTON LAYOUT (one place to change it):
+     🎙️ MIC  = bottom-LEFT      💬 CHAT = bottom-RIGHT      -> they can never sit on top of each other.
+   To move the mic, change `left` (or use `right` + auto) in .kv-fab and .kv-cap below.            */
+.kv-fab{position:fixed;left:16px;bottom:calc(88px + env(safe-area-inset-bottom,0px));z-index:95;width:58px;height:58px;border-radius:50%;
   border:0;cursor:pointer;background:var(--marigold);color:#16261D;font-size:26px;display:grid;place-items:center;
   box-shadow:0 6px 18px rgba(0,0,0,.30);touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .kv-fab:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 .kv-fab.live{animation:pulse 1.3s infinite}
 @media(prefers-reduced-motion:reduce){.kv-fab.live{animation:none;outline:3px solid var(--marigold);outline-offset:3px}}
+@media(max-width:520px){.kv-fab{bottom:calc(84px + env(safe-area-inset-bottom,0px))}}
 body:has(#scrim.on) .kv-fab{bottom:auto;top:70px}
-.kv-cap{position:fixed;right:14px;bottom:calc(162px + env(safe-area-inset-bottom,0px));z-index:95;max-width:min(78vw,320px);
+.kv-cap{position:fixed;left:16px;bottom:calc(154px + env(safe-area-inset-bottom,0px));z-index:95;max-width:min(calc(100vw - 32px),320px);
   background:#16261D;color:#EFF2EA;padding:8px 12px;border-radius:14px;font-size:13px;display:none;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 .kv-cap.on{display:block}
+@media(max-width:520px){.kv-cap{bottom:calc(150px + env(safe-area-inset-bottom,0px))}}
+body:has(#scrim.on) .kv-cap{bottom:auto;top:134px}
 .kv-sheet{position:fixed;inset:0;z-index:94;background:rgba(12,18,14,.55);display:flex;align-items:flex-start;justify-content:center}
-body:has(.kv-sheet) .kv-fab{top:auto;bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+body:has(.kv-sheet) .kv-fab{top:auto;bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+@media(max-width:520px){body:has(.kv-sheet) .kv-fab{bottom:calc(84px + env(safe-area-inset-bottom,0px))}}
+/* chat bubble (added by chat-widget.js): pinned bottom-RIGHT at the same height as the mic. !important because the
+   widget injects its own CSS later. Below the login screen (z 9999) and the full-screen chat panel; moves up when a pop-up is open. */
+#kc-bubble{left:auto!important;right:16px!important;bottom:calc(88px + env(safe-area-inset-bottom,0px))!important;z-index:96!important}
+@media(max-width:520px){#kc-bubble{bottom:calc(84px + env(safe-area-inset-bottom,0px))!important}}
+body:has(#scrim.on) #kc-bubble{bottom:auto!important;top:70px!important}
 .kv-card{background:var(--card);color:var(--ink);width:min(520px,100%);border-radius:0 0 18px 18px;padding:calc(16px + env(safe-area-inset-top,0px)) 18px 16px;
   max-height:calc(100vh - 190px);overflow:auto;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .kv-card b{font-size:17px}
