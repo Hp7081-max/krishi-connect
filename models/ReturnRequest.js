@@ -17,12 +17,14 @@ const returnRequestSchema = new mongoose.Schema({
     required: true,
     enum: [
       'damaged_crop',
+      'rotten_crop',      // frontend ye bhejta hai
       'rotten_spoiled',
       'poor_quality',
       'incorrect_grade',
       'incorrect_product',
       'quantity_mismatch',
       'description_mismatch',
+      'listing_mismatch', // frontend ye bhejta hai
       'other'
     ]
   },
@@ -74,7 +76,7 @@ const returnRequestSchema = new mongoose.Schema({
   isPerishable: { type: Boolean, default: true },
   dispositionAction: {
     type: String,
-    enum: ['physical_return', 'local_disposal', 'retained_by_buyer'],
+    enum: ['physical_return', 'local_disposal', 'retained_by_buyer', 'retain_by_buyer', 'return_to_farmer'],
     default: 'physical_return'
   },
 
@@ -97,7 +99,7 @@ const returnRequestSchema = new mongoose.Schema({
     shippingCost: { type: Number, default: 0 },
     costBearer: {
       type: String,
-      enum: ['seller', 'buyer', 'transporter', 'platform', 'uncertain'],
+      enum: ['seller', 'buyer', 'transporter', 'transit', 'split', 'platform', 'uncertain'],
       default: 'uncertain'
     },
     mandatoryReason: { type: String, default: '' },
@@ -154,6 +156,6 @@ const returnRequestSchema = new mongoose.Schema({
 
   created: { type: Number, default: Date.now },
   updated: { type: Number, default: Date.now }
-});
+}, { strict: false }); // strict:false: approvedRefund, decisionReason, dispatchProofUrls jaise extra fields bhi save hon
 
 module.exports = mongoose.model('ReturnRequest', returnRequestSchema);
