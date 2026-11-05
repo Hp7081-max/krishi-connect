@@ -914,19 +914,74 @@ async function getSoilAdvisory(n, p, k, lang = 'hi') {
 
 // ======================== RETURN & REFUND MANAGEMENT ========================
 
+// Helpers: Render par server restart/sleep hone par memory (data/db.json) khali ho jati hai, par asli data MongoDB me hota hai.
+// Isliye pehle memory dekhte hain, na mile to MongoDB se uthate hain.
+const CLOSED_RETURN_STATUSES = ['CLOSED', 'REJECTED', 'CANCELLED'];
+
+function escapeRegex(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function findDeal(id) {
+  inMemoryStore.deals = inMemoryStore.deals || [];
+  const mem = inMemoryStore.deals.find(d => d.id === id);
+  if (mem) return mem;
+  if (getDBStatus().isConnected) {
+    try { return await Deal.findOne({ id }).lean(); } catch (e) { console.error('findDeal failed:', e.message); }
+  }
+  return null;
+}
+
+async function findListing(id) {
+  if (!id) return null;
+  const mem = (inMemoryStore.listings || []).find(l => l.id === id);
+  if (mem) return mem;
+  if (getDBStatus().isConnected) {
+    try { return await Listing.findOne({ id }).lean(); } catch (e) { /* ignore */ }
+  }
+  return null;
+}
+
+async function findReturn(id) {
+  inMemoryStore.returns = inMemoryStore.returns || [];
+  const mem = inMemoryStore.returns.find(r => r.id === id);
+  if (mem) return mem;
+  if (getDBStatus().isConnected) {
+    try {
+      const doc = await ReturnRequest.findOne({ id }).lean();
+      if (doc) {
+        delete doc._id; delete doc.__v;
+        inMemoryStore.returns.unshift(doc); // memory me bhi rakh lo, aage ke updates isi par honge
+        return doc;
+      }
+    } catch (e) { console.error('findReturn failed:', e.message); }
+  }
+  return null;
+}
+
+async function persistReturn(ret, returnId) {
+  if (!getDBStatus().isConnected) return;
+  try {
+    const copy = { ...ret }; delete copy._id; delete copy.__v;
+    await ReturnRequest.updateOne({ id: returnId }, { $set: copy });
+  } catch (e) {
+    console.error('Error updating return in MongoDB:', e.message);
+  }
+}
+
 async function getReturns(filter = {}) {
   ensureDataFile();
   inMemoryStore.returns = inMemoryStore.returns || [];
   const dbStatus = getDBStatus();
 
   let results = [];
-  if (dbStatus.connected) {
+  if (dbStatus.isConnected) {
     try {
       const q = {};
       if (filter.role === 'farmer' && filter.user) {
-        q.farmer = new RegExp(filter.user, 'i');
+        q.farmer = new RegExp(escapeRegex(filter.user), 'i');
       } else if (filter.role === 'buyer' && filter.user) {
-        q.buyer = new RegExp(filter.user, 'i');
+        q.buyer = new RegExp(escapeRegex(filter.user), 'i');
       }
       if (filter.dealId) q.dealId = filter.dealId;
       if (filter.status && filter.status !== 'all') q.status = filter.status;
@@ -940,7 +995,7 @@ async function getReturns(filter = {}) {
   }
 
   // Filter in memory if MongoDB is offline or fallback
-  if (!dbStatus.connected) {
+  if (!dbStatus.isConnected) {
     let list = inMemoryStore.returns || [];
     if (filter.role === 'farmer' && filter.user) {
       const u = filter.user.trim().toLowerCase();
@@ -961,7 +1016,7 @@ async function getReturnById(id) {
   ensureDataFile();
   inMemoryStore.returns = inMemoryStore.returns || [];
   const dbStatus = getDBStatus();
-  if (dbStatus.connected) {
+  if (dbStatus.isConnected) {
     try {
       const found = await ReturnRequest.findOne({ id }).lean();
       if (found) return found;
@@ -975,11 +1030,14 @@ async function createReturnRequest(data) {
   inMemoryStore.returns = inMemoryStore.returns || [];
 
   if (!data.dealId) throw new Error('Deal ID is required');
-  const deal = (inMemoryStore.deals || []).find(d => d.id === data.dealId);
+  const deal = await findDeal(data.dealId);
   if (!deal) throw new Error(`Deal #${data.dealId} not found`);
 
-  // Prevent duplicate open returns
-  const existing = (inMemoryStore.returns || []).find(r => r.dealId === data.dealId && !['CLOSED', 'REJECTED', 'CANCELLED'].includes(r.status));
+  // Prevent duplicate open returns (memory + MongoDB dono me dekhte hain)
+  let existing = (inMemoryStore.returns || []).find(r => r.dealId === data.dealId && !CLOSED_RETURN_STATUSES.includes(r.status));
+  if (!existing && getDBStatus().isConnected) {
+    try { existing = await ReturnRequest.findOne({ dealId: data.dealId, status: { $nin: CLOSED_RETURN_STATUSES } }).lean(); } catch (e) { /* ignore */ }
+  }
   if (existing) {
     throw new Error(`An active return request (${existing.id}) already exists for Deal #${data.dealId}`);
   }
@@ -994,6 +1052,7 @@ async function createReturnRequest(data) {
   const estimatedRefund = Math.round((qtyAffected / qtyOrdered) * dealAmount);
   const estimatedReturnShipping = Math.round(Math.min(1500, Math.max(350, qtyAffected * 15)));
 
+  const listing = await findListing(deal.listingId);
   const returnId = uid('RET');
   const now = Date.now();
 
@@ -1001,8 +1060,8 @@ async function createReturnRequest(data) {
     id: returnId,
     dealId: deal.id,
     listingId: deal.listingId || '',
-    cropKey: data.cropKey || 'crop',
-    cropName: data.cropName || (data.cropKey || 'फसल'),
+    cropKey: data.cropKey || (listing && listing.cropKey) || 'crop',
+    cropName: data.cropName || (listing && (listing.cropName || listing.cropKey)) || data.cropKey || 'फसल',
     buyer: data.buyer || deal.buyer,
     buyerPhone: data.buyerPhone || deal.buyerPhone || '',
     farmer: deal.farmer,
@@ -1068,17 +1127,19 @@ async function createReturnRequest(data) {
     updated: now
   };
 
-  inMemoryStore.returns.unshift(newReturn);
-  saveStore();
-
+  // Pehle MongoDB me save karo. Fail ho to user ko saaf error dikhao (pehle ye chupchap ignore ho jata tha
+  // aur complaint list se gayab ho jati thi).
   const dbStatus = getDBStatus();
-  if (dbStatus.connected) {
+  if (dbStatus.isConnected) {
     try {
       await ReturnRequest.create(newReturn);
     } catch (e) {
       console.error('Error saving return to MongoDB:', e.message);
+      throw new Error('Complaint save nahi ho paayi: ' + e.message);
     }
   }
+  inMemoryStore.returns.unshift(newReturn);
+  saveStore();
 
   emitEvent('return:created', newReturn);
   return newReturn;
@@ -1088,7 +1149,7 @@ async function farmerRespondReturn(returnId, farmerName, payload) {
   ensureDataFile();
   inMemoryStore.returns = inMemoryStore.returns || [];
 
-  const ret = inMemoryStore.returns.find(r => r.id === returnId);
+  const ret = await findReturn(returnId);
   if (!ret) throw new Error(`Return request #${returnId} not found`);
 
   const fName = (farmerName || '').trim().toLowerCase();
@@ -1133,12 +1194,7 @@ async function farmerRespondReturn(returnId, farmerName, payload) {
   ret.updated = now;
   saveStore();
 
-  const dbStatus = getDBStatus();
-  if (dbStatus.connected) {
-    try {
-      await ReturnRequest.updateOne({ id: returnId }, { $set: ret });
-    } catch (e) {}
-  }
+  await persistReturn(ret, returnId);
 
   emitEvent('return:updated', ret);
   return ret;
@@ -1148,7 +1204,7 @@ async function adminResolveReturn(returnId, adminName, payload) {
   ensureDataFile();
   inMemoryStore.returns = inMemoryStore.returns || [];
 
-  const ret = inMemoryStore.returns.find(r => r.id === returnId);
+  const ret = await findReturn(returnId);
   if (!ret) throw new Error(`Return request #${returnId} not found`);
 
   if (!payload.mandatoryReason || !payload.mandatoryReason.trim()) {
@@ -1234,10 +1290,11 @@ async function adminResolveReturn(returnId, adminName, payload) {
       });
 
       // If seller is at fault, record adjustment
-      const deal = (inMemoryStore.deals || []).find(d => d.id === ret.dealId);
-      if (deal) {
-        if (costBearer === 'seller') {
-          deal.quality = `Return/Refund adjusted (-₹${refundAmount})`;
+      const deal = await findDeal(ret.dealId);
+      if (deal && costBearer === 'seller') {
+        deal.quality = `Return/Refund adjusted (-₹${refundAmount})`;
+        if (getDBStatus().isConnected) {
+          try { await Deal.updateOne({ id: ret.dealId }, { $set: { quality: deal.quality } }); } catch (e) { console.error('Deal update failed:', e.message); }
         }
       }
 
@@ -1275,12 +1332,7 @@ async function adminResolveReturn(returnId, adminName, payload) {
   ret.updated = now;
   saveStore();
 
-  const dbStatus = getDBStatus();
-  if (dbStatus.connected) {
-    try {
-      await ReturnRequest.updateOne({ id: returnId }, { $set: ret });
-    } catch (e) {}
-  }
+  await persistReturn(ret, returnId);
 
   emitEvent('return:updated', ret);
   emitEvent('return:resolved', { returnId, status: ret.status, refundAmount });
@@ -1291,7 +1343,7 @@ async function requestMoreEvidence(returnId, adminName, payload) {
   ensureDataFile();
   inMemoryStore.returns = inMemoryStore.returns || [];
 
-  const ret = inMemoryStore.returns.find(r => r.id === returnId);
+  const ret = await findReturn(returnId);
   if (!ret) throw new Error(`Return request #${returnId} not found`);
 
   if (!payload.message || !payload.message.trim()) {
@@ -1320,12 +1372,7 @@ async function requestMoreEvidence(returnId, adminName, payload) {
   ret.updated = now;
   saveStore();
 
-  const dbStatus = getDBStatus();
-  if (dbStatus.connected) {
-    try {
-      await ReturnRequest.updateOne({ id: returnId }, { $set: ret });
-    } catch (e) {}
-  }
+  await persistReturn(ret, returnId);
 
   emitEvent('return:updated', ret);
   return ret;
@@ -1335,7 +1382,7 @@ async function submitAdditionalEvidence(returnId, userName, userRole, payload) {
   ensureDataFile();
   inMemoryStore.returns = inMemoryStore.returns || [];
 
-  const ret = inMemoryStore.returns.find(r => r.id === returnId);
+  const ret = await findReturn(returnId);
   if (!ret) throw new Error(`Return request #${returnId} not found`);
 
   const now = Date.now();
@@ -1360,12 +1407,7 @@ async function submitAdditionalEvidence(returnId, userName, userRole, payload) {
   ret.updated = now;
   saveStore();
 
-  const dbStatus = getDBStatus();
-  if (dbStatus.connected) {
-    try {
-      await ReturnRequest.updateOne({ id: returnId }, { $set: ret });
-    } catch (e) {}
-  }
+  await persistReturn(ret, returnId);
 
   emitEvent('return:updated', ret);
   return ret;
@@ -1375,7 +1417,7 @@ async function updateReturnShipment(returnId, payload) {
   ensureDataFile();
   inMemoryStore.returns = inMemoryStore.returns || [];
 
-  const ret = inMemoryStore.returns.find(r => r.id === returnId);
+  const ret = await findReturn(returnId);
   if (!ret) throw new Error(`Return request #${returnId} not found`);
 
   const now = Date.now();
@@ -1408,12 +1450,7 @@ async function updateReturnShipment(returnId, payload) {
   ret.updated = now;
   saveStore();
 
-  const dbStatus = getDBStatus();
-  if (dbStatus.connected) {
-    try {
-      await ReturnRequest.updateOne({ id: returnId }, { $set: ret });
-    } catch (e) {}
-  }
+  await persistReturn(ret, returnId);
 
   emitEvent('return:updated', ret);
   return ret;
